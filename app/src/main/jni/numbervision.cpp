@@ -131,12 +131,12 @@ jobject convertNativeToBitmap(JNIEnv * env, NativeBitmap* nBitmap){
 
 }
 
-jobjectArray createJavaArray(JNIEnv *env, jsize count, const std::string elements[]){
+jobjectArray createJavaArray(JNIEnv *env, jsize count, std::string elements[]){
     jclass stringClass = env->FindClass("java/lang/String");
-    jobjectArray row = env->NewObjectArray(count, stringClass, 0);
+    jobjectArray row = env->NewObjectArray(count, stringClass, env->NewStringUTF(""));
     jsize i;
 
-    for (i = 0; i < count; ++i) {
+    for (i = 0; i < count; i++) {
         env->SetObjectArrayElement( row, i, env->NewStringUTF(elements[i].c_str()));
     }
     return row;
@@ -150,7 +150,10 @@ jobjectArray createJavaArray(JNIEnv *env, jsize count, const std::string element
 JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap){
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
 
-    const std::string tes[] = { "12+32", "44" };
+
+
+    // [1] adalah ekspresi input, [2] adalah hasil perhitungan
+    std::string tes[] = { "12+32", "44" };
     jobjectArray hasil = createJavaArray(env, 2, tes);
 
     return hasil;
