@@ -15,11 +15,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        TextView tv = (TextView) findViewById(R.id.textView);
+        detectAll(BitmapFactory.decodeResource(getResources(), R.drawable.learning));
 
-        String tes[] = detectAll(BitmapFactory.decodeResource(getResources(), R.drawable.tc2));
-
-        tv.setText(tes[0]);
     }
 
 
