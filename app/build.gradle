@@ -13,6 +13,7 @@ android {
 
         ndk {
             moduleName "numbervision"
+            stl "stlport_shared"
             ldLibs "log", "jnigraphics"
         }
     }

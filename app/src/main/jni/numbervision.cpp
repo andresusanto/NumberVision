@@ -6,7 +6,7 @@
 #include <android/log.h>
 #include <stdio.h>
 #include <android/bitmap.h>
-#include <cstring>
+#include <string>
 #include <unistd.h>
 #include <cmath>
 
@@ -18,7 +18,7 @@
 // supaya bisa dipanggil sama java
 extern "C"
 {
-JNIEXPORT jstring JNICALL Java_com_ganesus_numbervision_MainActivity_test (JNIEnv * env, jobject obj);
+    JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap);
 }
 
 
@@ -131,12 +131,27 @@ jobject convertNativeToBitmap(JNIEnv * env, NativeBitmap* nBitmap){
 
 }
 
+jobjectArray createJavaArray(JNIEnv *env, jsize count, const std::string elements[]){
+    jclass stringClass = env->FindClass("java/lang/String");
+    jobjectArray row = env->NewObjectArray(count, stringClass, 0);
+    jsize i;
+
+    for (i = 0; i < count; ++i) {
+        env->SetObjectArrayElement( row, i, env->NewStringUTF(elements[i].c_str()));
+    }
+    return row;
+}
+
 
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 
-JNIEXPORT jstring JNICALL Java_com_ganesus_numbervision_MainActivity_test (JNIEnv * env, jobject obj){
+JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap){
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
 
-    return env->NewStringUTF("Coba coba gan!");
+    const std::string tes[] = { "12+32", "44" };
+    jobjectArray hasil = createJavaArray(env, 2, tes);
+
+    return hasil;
 }
