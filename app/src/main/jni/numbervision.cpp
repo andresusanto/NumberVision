@@ -202,9 +202,9 @@ double get_point(int expected_direction,int actual_direction){
     } else if (diff == 1){
         return 0.5;
     } else if (diff == 2){
-        return -1;
+        return -0.1;
     } else {
-        return -5;
+        return -1;
     }
 }
 
@@ -249,12 +249,17 @@ double get_match_result(short chain_code[],int code_length,Number number){
 }
 
 int match_chain_code(short chain_code[],int code_length,vector<Number> numbers,int nnumbers){
-    double maks = -1;
+    Number number = chain_code_to_number(-1,chain_code,code_length);
+    for(int i = 0; i < number.npath; i++){
+        LOGD("%d %d\n",number.path[i].direction,number.path[i].ratio);
+    }
+    double maks = -1e+14;
     int label = -1;
     for(int i = 0; i < nnumbers; ++i){
         //double res = 0;
         double res = get_match_result(chain_code,code_length,numbers[i]);
         printf("%d %lf\n",numbers[i].label,res);
+        LOGD("%d %lf\n",numbers[i].label,res);
         if (maks < res){
             label = numbers[i].label;
             maks = res;
@@ -559,7 +564,208 @@ PathElement path_nol[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), 
 
 PathElement path_tambah[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
 PathElement path_kurang[] = {PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
+//  1
+// ******
+// ******
+//4**  **2
+// **  **
+// ******
+// ******
+//  3
+PathElement zero_path[] = {PathElement(E,6),PathElement(S,6),PathElement(W,6),PathElement(N,6)};
 
+//
+//
+// **
+// **
+// **
+// **
+// **
+// **
+//
+
+PathElement one_path[] = {
+        PathElement(E,1),
+        PathElement(S,8),
+        PathElement(W,1),
+        PathElement(N,8)
+};
+PathElement two_path[] =  {
+        //   1
+        // ******
+//   12******
+        //     **  2
+        //   9 **
+        // ******
+        // ******
+        //8**4
+        // **
+        // ******6
+        // ******
+        //  7
+        PathElement(E,6), //1
+        PathElement(S,6), //2
+        PathElement(W,4), //3
+        PathElement(S,2), //4
+        PathElement(E,4), //5
+        PathElement(S,2), //6
+        PathElement(W,6), //7
+        PathElement(N,6), //8
+        PathElement(E,4), //9
+        PathElement(N,2), //10
+        PathElement(W,4), //11
+        PathElement(N,2) //12
+};
+
+PathElement three_path[] = {
+/**
+      1
+12 ******
+   ******
+       **
+       **
+8  ****** 2
+   ******
+       **
+       **
+4  ******
+   ******
+     3
+**/
+        PathElement(E,6), //1
+        PathElement(S,10), //2
+        PathElement(W,6), //3
+        PathElement(N,2), //4
+        PathElement(E,4), //5
+        PathElement(N,2), //6
+        PathElement(W,4), //7
+        PathElement(N,2), //8
+        PathElement(E,4), //9
+        PathElement(N,2), //10
+        PathElement(W,4), //11
+        PathElement(N,2), //12
+};
+PathElement four_path[] = {
+/**
+    1   5
+   **  **
+10 **  **
+   ******6
+   ******
+  9    **
+       **
+       7
+**/
+        PathElement(E,2), //1
+        PathElement(S,2), //2
+        PathElement(E,2), //3
+        PathElement(N,2), //4
+        PathElement(E,2), //5
+        PathElement(S,6), //6
+        PathElement(W,2), //7
+        PathElement(N,2), //8
+        PathElement(W,4), //9
+        PathElement(N,4) //10
+};
+PathElement five_path[] = {
+/**
+    1
+  ******
+  ****** 2
+  **
+12**  5
+  ******
+  ******
+      **6
+      **
+  ******
+ 8******
+     7
+**/
+        PathElement(E,6), //1
+        PathElement(S,2), //2
+        PathElement(W,4), //3
+        PathElement(S,2), //4
+        PathElement(E,4), //5
+        PathElement(S,6), //6
+        PathElement(W,6), //7
+        PathElement(N,2), //8
+        PathElement(E,4), //9
+        PathElement(N,2), //10
+        PathElement(W,4), //11
+        PathElement(N,6), //12
+};
+/**
+
+   1
+  ****** 2
+  ******
+  **
+  **  5
+  ******
+8 ******
+  **  ** 6
+  **  **
+  ******
+  ******
+  7
+**/
+PathElement six_path[] = {
+        PathElement(E,6), //1
+        PathElement(S,2), //2
+        PathElement(W,4), //3
+        PathElement(S,2), //4
+        PathElement(E,4), //5
+        PathElement(S,6), //6
+        PathElement(W,6), //7
+        PathElement(N,10) //8
+};
+
+/**
+  1
+  ******
+ 6******
+      **
+    4 ** 2
+      **
+      **
+      3
+**/
+
+PathElement seven_path[] = {
+        PathElement(E,6), //1
+        PathElement(S,6), //2
+        PathElement(W,2), //3
+        PathElement(N,4), //4
+        PathElement(W,4), //5
+        PathElement(N,2) //6
+};
+
+/**
+    1
+ ******
+ ******
+ **  **
+8**  ** 2
+ ******
+ ******
+     **
+  5  **
+4******
+ ******
+    3
+**/
+PathElement nine_path[] = {
+        PathElement(E,6), //1
+        PathElement(S,10),//2
+        PathElement(W,6),//3
+        PathElement(N,2),//4
+        PathElement(E,4),//5
+        PathElement(N,2),//6
+        PathElement(W,4),//7
+        PathElement(N,6),//8
+
+};
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -569,20 +775,28 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     bool **image;
 
     vector<Number> numbers;
-
-
-    numbers.push_back( Number(1, 49,path_satu) );
-    numbers.push_back( Number(2, 168,path_dua) );
-    numbers.push_back( Number(3, 164,path_tiga) );
-    numbers.push_back( Number(4, 64,path_empat) );
-    numbers.push_back( Number(5, 103,path_lima) );
-    numbers.push_back( Number(6, 118,path_enam) );
-    numbers.push_back( Number(7, 105,path_tujuh) );
-    numbers.push_back( Number(8, 144,path_delapan) );
-    numbers.push_back( Number(9, 132,path_sembilan) );
-    numbers.push_back( Number(0, 100,path_nol) );
-    numbers.push_back( Number(11, 22,path_tambah) );
-    numbers.push_back( Number(12, 10,path_kurang) );
+    numbers.push_back(Number(0,4,zero_path));
+    //satu gak dimasukin. masih ngebug.
+    //numbers.push_back(Number(1,4,one_path));
+    numbers.push_back(Number(2,12,two_path));
+    numbers.push_back(Number(5,12,five_path));
+    numbers.push_back(Number(4,10,four_path));
+    numbers.push_back(Number(3,12,three_path));
+    numbers.push_back(Number(6,8,six_path));
+    numbers.push_back(Number(7,6,seven_path));
+    numbers.push_back(Number(9,8,nine_path));
+//    numbers.push_back( Number(1, 49,path_satu) );
+//    numbers.push_back( Number(2, 168,path_dua) );
+//    numbers.push_back( Number(3, 164,path_tiga) );
+//    numbers.push_back( Number(4, 64,path_empat) );
+//    numbers.push_back( Number(5, 103,path_lima) );
+//    numbers.push_back( Number(6, 118,path_enam) );
+//    numbers.push_back( Number(7, 105,path_tujuh) );
+//    numbers.push_back( Number(8, 144,path_delapan) );
+//    numbers.push_back( Number(9, 132,path_sembilan) );
+//    numbers.push_back( Number(0, 100,path_nol) );
+//    numbers.push_back( Number(11, 22,path_tambah) );
+//    numbers.push_back( Number(12, 10,path_kurang) );
 
     image = new bool*[nativeBitmap->bitmapInfo.height];
     for (int i=0;i<nativeBitmap->bitmapInfo.height;i++) {
