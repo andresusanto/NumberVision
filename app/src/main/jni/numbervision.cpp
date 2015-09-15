@@ -812,6 +812,8 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
     delete nativeBitmap;
 
+    string hasil;
+
     for (int i=0;i<border_infos.size();i++) {
         BorderInfo border_info = border_infos[i];
 
@@ -821,18 +823,20 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
         short* test = new short[ukuran];
         for (int j=0;j<border_info.chain_codes.size();j++) {
             test[j] = border_info.chain_codes[j];
-            ss << border_info.chain_codes[j];
+            //ss << border_info.chain_codes[j];
             //LOGD("%d \n", border_info.chain_codes[j]);
             //cout<<border_info.chain_codes[j]<<endl;
         }
-        LOGD("KIRA KIRA = %d \n", match_chain_code(test,ukuran,numbers, numbers.size()));
+        ss << match_chain_code(test,ukuran,numbers, numbers.size());
+        hasil = ss.str();
+        //LOGD("KIRA KIRA = %d \n", match_chain_code(test,ukuran,numbers, numbers.size()));
 
     }
 
 
     // [1] adalah ekspresi input, [2] adalah hasil perhitungan
-    std::string tes[] = { "12+32", "44" };
-    jobjectArray hasil = createJavaArray(env, 2, tes);
+    std::string tes[] = { hasil.c_str(), "44" };
+    jobjectArray hasil2 = createJavaArray(env, 2, tes);
 
-    return hasil;
+    return hasil2;
 }
