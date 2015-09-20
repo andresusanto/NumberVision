@@ -15,19 +15,12 @@
 #include <queue>
 #include <sstream>
 
-#define E  0
-#define SE 1
-#define S  2
-#define SW 3
-#define W  4
-#define NW 5
-#define N  6
-#define NE 7
 
 #define  LOG_TAG    "NUMBER VISION"
 #define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
 #define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
-#define NOT_SPECIFIED_COLOR -1
+
+#define STABILIZATION_FACTOR 4 // faktor untuk stabilisasi (copot noise dari chain code)
 
 // supaya bisa dipanggil sama java
 extern "C"
@@ -41,7 +34,20 @@ using namespace std;
 /////////////////////////////////////////////////////////////////////////////////////
 // helper class and functions
 /////////////////////////////////////////////////////////////////////////////////////
+typedef struct{
+    char value;
+    int start;
+} DetectedChar;
 
+typedef struct{
+    char direction;
+    int value;
+} ECode;
+
+typedef struct{
+    char meaning;
+    string data;
+} Knowledge;
 
 typedef struct point{
     int x;
@@ -75,68 +81,6 @@ public:
     }
 };
 
-struct PathElement {
-    short direction;
-    int ratio;
-
-    PathElement(){
-        this->direction = -1;
-        this->ratio = 0;
-    }
-
-    PathElement(int direction,int ratio){
-        this->direction = direction;
-        this->ratio = ratio;
-    }
-};
-
-struct Number
-{
-    int label;
-    PathElement* path;
-    int npath;
-
-    Number(){}
-    Number(int label,int npath,PathElement* path){
-        this->npath = npath;
-        this->label = label;
-        this->path = (PathElement*) malloc(npath*sizeof(PathElement));
-        for(int i = 0; i < npath; i++){
-            this->path[i] = path[i];
-        }
-
-    }
-
-    ~Number(){
-        //free(path);
-    }
-
-    void print_path(){
-        stringstream ss;
-        LOGD("Jumlah = %d", this->npath);
-        for(int i = 0; i < this->npath; i++){
-            ss << "PathElement(" << path[i].direction << "," << path[i].direction << "), ";
-            ss.seekg(0, ios::end);
-            int size = ss.tellg();
-
-            if (size == 900){
-                LOGD("%s", ss.str().c_str());
-                ss.clear();//clear any bits set
-                ss.str(std::string());
-            }
-        }
-        LOGD("%s", ss.str().c_str());
-        //printf("\n");
-    }
-
-    int get_length(){
-        int sum = 0;
-        for(int i = 0; i < npath; i++){
-            sum += path[i].ratio;
-        }
-        return sum;
-    }
-};
 
 typedef struct{
     uint8_t alpha, red, green, blue;
@@ -151,121 +95,6 @@ void convertIntToArgb(uint32_t pixel, ARGB* argb){
     argb->green = ((pixel >> 8) & 0xff);
     argb->blue = ((pixel >> 16) & 0xff);
     argb->alpha = ((pixel >> 24) & 0xff);
-}
-
-
-Number chain_code_to_number(int label,short chain_code[],int code_length){
-
-    int last_chain = -1;
-    int counter = 0;
-    queue<PathElement> que;
-
-    for(int i = 0; i < code_length; i++){
-        if (last_chain != chain_code[i]){
-            if (counter > 0){
-                que.push(PathElement(last_chain,counter));
-            }
-            last_chain = chain_code[i];
-            counter = 1;
-        } else {
-            counter++;
-        }
-    }
-    if (counter > 0){
-        que.push(PathElement(last_chain,counter));
-    }
-    PathElement* path = new PathElement[que.size()];
-    int i = 0;
-    while(!que.empty()){
-        path[i] = que.front(); que.pop();
-        i++;
-    }
-    return Number(label,i,path);
-}
-
-double get_point(int expected_direction,int actual_direction){
-    int i = expected_direction;
-    int cwcounter = 0;
-    while (i != actual_direction){
-        i++; cwcounter++;
-        if (i > 7) i %= 8;
-    }
-    i = expected_direction;
-    int ccwcounter = 0;
-    while (i != actual_direction){
-        i--; ccwcounter++;
-        if (i < 0) i += 8;
-    }
-    int diff = min(cwcounter,ccwcounter);
-    if (diff == 0){
-        return 1;
-    } else if (diff == 1){
-        return 0.5;
-    } else if (diff == 2){
-        return -0.1;
-    } else {
-        return -1;
-    }
-}
-
-
-double get_match_result(short chain_code[],int code_length,Number number){
-#ifdef DEBUG
-    printf("-------\n");
-    printf("match with number = %d\n",number.label);
-#endif
-    int n_length = number.get_length();
-    double scale_ratio = (code_length * 1.0)/n_length;
-    int last_path_length = 0;
-
-    double point_sum = 0;
-    for(int p = 0; p < number.npath; p++){
-        double points = 0;
-        int start = (int) floor(last_path_length * scale_ratio);
-        int offset = (int) ceil(start + number.path[p].ratio*scale_ratio);
-        int end = min(offset,code_length);
-#ifdef DEBUG
-        printf("match with %d, ratio %d\n",number.path[p].direction,number.path[p].ratio);
-#endif
-        for(int i = start; i < end; i++){
-            points += get_point(number.path[p].direction,chain_code[i]);
-            //printf("%d",chain_code[i]);
-        }
-#ifdef DEBUG
-        printf("\n");
-        printf("points = %.3lf\n",points);
-        printf("\n");
-#endif
-        point_sum += points;
-        last_path_length += number.path[p].ratio;
-    }
-    double ret = point_sum / n_length;
-#ifdef DEBUG
-    printf("%.3lf\n",ret);
-    printf("------\n");
-#endif
-    return ret;
-
-}
-
-int match_chain_code(short chain_code[],int code_length,vector<Number> numbers,int nnumbers){
-    Number number = chain_code_to_number(-1,chain_code,code_length);
-    for(int i = 0; i < number.npath; i++){
-        LOGD("%d %d\n",number.path[i].direction,number.path[i].ratio);
-    }
-    double maks = -1e+14;
-    int label = -1;
-    for(int i = 0; i < nnumbers; ++i){
-        //double res = 0;
-        double res = get_match_result(chain_code,code_length,numbers[i]);
-        printf("%d %lf\n",numbers[i].label,res);
-        LOGD("%d %lf\n",numbers[i].label,res);
-        if (maks < res){
-            label = numbers[i].label;
-            maks = res;
-        }
-    }
-    return label;
 }
 
 
@@ -516,256 +345,153 @@ vector<BorderInfo> get_border_infos(bool **image,int length,int height) {
 
 
 ////////////////////////////////////////////////////////////////////////////////////////
-
-// PATTERN
-
+// ALGORITMA MATCHER
 ////////////////////////////////////////////////////////////////////////////////////////
 
 
-PathElement path_satu[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6) };
+vector<ECode> stabileData(string original){
+    vector<ECode> training;
 
-PathElement path_dua[] = { PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2),
-                           PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0),
-                           PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3),
-                           PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
+    char currentDirection = original[0];
+    int currentValue = 1;
+    for (int i = 1 ; i < original.size(); i++){
+        if (currentDirection == original[i])
+            currentValue++;
+        else{
+            ECode kode;
+            kode.direction = currentDirection;
+            kode.value = currentValue;
+
+            training.push_back(kode);
+
+            currentValue = 1;
+            currentDirection = original[i];
+        }
+    }
+    ECode kode;
+    kode.direction = currentDirection;
+    kode.value = currentValue;
+    training.push_back(kode);
+
+    // pemotong chain code, kalo ga dipake malah hasilnya lebih bagus :/
+    /*
+    for (int i = 1; i < training.size() - 1; i++){
+        if (training[i - 1].direction == training[i + 1].direction && training[i - 1].value + training[i + 1].value > STABILIZATION_FACTOR && training[i].value == 1){
+            training[i - 1].value = training[i - 1].value + training[i].value + training[i + 1].value;
+            training.erase(training.begin() + i, training.begin() + i + 2);
+            //cout << (i-1) << " After Train : " << training[i - 1].value << endl;
+
+            i--;
+        }
+    }*/
+
+    return training;
+}
+
+float calculateChain (string strKnowledge, string strTest ){
+    vector<ECode> knowledge, test;
+    vector<ECode> data1 = stabileData (strKnowledge);
+    vector<ECode> data2 = stabileData(strTest);
+
+    // pilih yang paling besar sebagai basis (mengandung paling banyak error)
+    if (data1.size() > data2.size()){
+        knowledge = data1;
+        test = data2;
+    }else{
+        knowledge = data2;
+        test = data1;
+    }
+
+    int testSize = test.size(), knowledgeSize = knowledge.size();
+    int knowledgeChains = 0, testChains = 0;
+
+    for (int i = 0 ; i < knowledgeSize; i++)
+        knowledgeChains += knowledge[i].value;
+
+    for (int i = 0 ; i < testSize; i++)
+        testChains += test[i].value;
 
 
-PathElement path_tiga[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4),
-                           PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(5,5), PathElement(4,4),
-                           PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2),
-                           PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)
-};
+    float currentScore = 0; int iteratorKnowledge = 0;
 
-PathElement path_empat[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0),
-                            PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
+    for (int i = 0; i < testSize && iteratorKnowledge < knowledgeSize; i++){
+        if (test[i].direction == knowledge[iteratorKnowledge].direction){
+            currentScore += ((float)test[i].value / testChains + (float)knowledge[iteratorKnowledge].value / knowledgeChains) * 2.0f;
+        }else{
+            currentScore -= (float)knowledge[iteratorKnowledge].value / (knowledgeChains * 2.0f);
+            i--;
+        }
+        iteratorKnowledge++;
 
-PathElement path_lima[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2),
-                           PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6),
-                           PathElement(0,0), PathElement(7,7), PathElement(6,6)};
+        if (iteratorKnowledge == knowledgeSize){
+            for (; i < testSize; i++){
+                currentScore -= (float)test[i].value / testChains;
+            }
+        }
+    }
 
-PathElement path_enam[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2),
-                           PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6),
-                           PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
 
-PathElement path_tujuh[] = {PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2),
-                            PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5),
-                            PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
+    return currentScore;
+}
 
-PathElement path_delapan[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2),
-                              PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6),
-                              PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
+vector<Knowledge> createKnowledge(){
+    vector<Knowledge> result;
 
-PathElement path_sembilan[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2),
-                               PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(5,5), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5),
-                               PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
+    Knowledge satu, dua, tiga, empat, lima, enam, tujuh, delapan, sembilan, nol;
 
-PathElement path_nol[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2),
-                          PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
 
-PathElement path_tambah[] = {PathElement(0,0), PathElement(2,2), PathElement(1,1), PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(3,3), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
-PathElement path_kurang[] = {PathElement(0,0), PathElement(2,2), PathElement(4,4), PathElement(6,6), PathElement(5,5), PathElement(4,4), PathElement(6,6), PathElement(0,0), PathElement(7,7), PathElement(6,6)};
-//  1
-// ******
-// ******
-//4**  **2
-// **  **
-// ******
-// ******
-//  3
-PathElement zero_path[] = {PathElement(E,6),PathElement(S,6),PathElement(W,6),PathElement(N,6)};
+    satu.meaning = '1';
+    dua.meaning = '2';
+    tiga.meaning = '3';
+    empat.meaning = '4';
+    lima.meaning = '5';
+    enam.meaning = '6';
+    tujuh.meaning = '7';
+    delapan.meaning = '8';
+    sembilan.meaning = '9';
+    nol.meaning = '0';
 
-//
-//
-// **
-// **
-// **
-// **
-// **
-// **
-//
+    satu.data = "0000000122222222222222222222222222222222222222222222222222222100000000000222224444444444444444444444444444444444466666000000000000076666666666666666666666666666666666666666666665334343433434466666770770707707707";
+    dua.data = "00000000000100101011121212222222222222323232323323333233333333333333310000000000000000000000000012222244444444444444444444444444444444444445666667677777777777767777776777676767666766666656565554454444434434334344466666607707007007";
+    tiga.data = "000000000001001010111212212222222232233233434331001010111121221222222322323233343434344434444444444445444544545566666600010101010010000000700770767766666666565555454445444444444445666700000000007007707767676666656655554544444434434343344466666607707070007";
+    empat.data = "000000000012222222222222222222222222222222222222210000000122223444444432222222222222444444446666666666666544444444444444444444444445666666767677676776767767677676776767767677677";
+    lima.data = "00000000000000000000000000000002222224444444444444444444444432222222222222222100000000000010001010110211212212222222223223232333343434344434444444444445444544546566667001010010010000000700707777766766666665665555454445444444444434445466666666666666666666666666667";
+    enam.data = "00000000000010001122224444544454444444343433333232323222232222170070070000000000001001011021121222122222222322232323333343434434444444444454445455556556656665666666566666666666766666676667667676777777707070007";
+    tujuh.data = "000000000000000000000000000000000000001222223223232323223232322323232232323223232323223232322323234444444457676767667676767667676767667676767667676767667676767544444444444444444444444444444566667";
+    delapan.data = "0000000000010001010112112221222322232333333433210110111021121221222223223233234343434443444444444444454445454555565665666667667676770777070765545554655656656666766676777707070007";
+    sembilan.data = "000000000001001010111212121221222222122222222222223222223222323223323333334344344344444444444454445456666600001000100000007007077777767676667666665343444344444444444544454555556656665666666676667676777770707007";
+    nol.data = "000000000001001010111121212212221222222222222222222222222322223223233233334343443444444444445445454555565656656666566666666666666666666666766676676767677770707007";
 
-PathElement one_path[] = {
-        PathElement(E,1),
-        PathElement(S,8),
-        PathElement(W,1),
-        PathElement(N,8)
-};
-PathElement two_path[] =  {
-        //   1
-        // ******
-//   12******
-        //     **  2
-        //   9 **
-        // ******
-        // ******
-        //8**4
-        // **
-        // ******6
-        // ******
-        //  7
-        PathElement(E,6), //1
-        PathElement(S,6), //2
-        PathElement(W,4), //3
-        PathElement(S,2), //4
-        PathElement(E,4), //5
-        PathElement(S,2), //6
-        PathElement(W,6), //7
-        PathElement(N,6), //8
-        PathElement(E,4), //9
-        PathElement(N,2), //10
-        PathElement(W,4), //11
-        PathElement(N,2) //12
-};
+    result.push_back(satu);
+    result.push_back(dua);
+    result.push_back(tiga);
+    result.push_back(empat);
+    result.push_back(lima);
+    result.push_back(enam);
+    result.push_back(tujuh);
+    result.push_back(delapan);
+    result.push_back(sembilan);
+    result.push_back(nol);
 
-PathElement three_path[] = {
-/**
-      1
-12 ******
-   ******
-       **
-       **
-8  ****** 2
-   ******
-       **
-       **
-4  ******
-   ******
-     3
-**/
-        PathElement(E,6), //1
-        PathElement(S,10), //2
-        PathElement(W,6), //3
-        PathElement(N,2), //4
-        PathElement(E,4), //5
-        PathElement(N,2), //6
-        PathElement(W,4), //7
-        PathElement(N,2), //8
-        PathElement(E,4), //9
-        PathElement(N,2), //10
-        PathElement(W,4), //11
-        PathElement(N,2), //12
-};
-PathElement four_path[] = {
-/**
-    1   5
-   **  **
-10 **  **
-   ******6
-   ******
-  9    **
-       **
-       7
-**/
-        PathElement(E,2), //1
-        PathElement(S,2), //2
-        PathElement(E,2), //3
-        PathElement(N,2), //4
-        PathElement(E,2), //5
-        PathElement(S,6), //6
-        PathElement(W,2), //7
-        PathElement(N,2), //8
-        PathElement(W,4), //9
-        PathElement(N,4) //10
-};
-PathElement five_path[] = {
-/**
-    1
-  ******
-  ****** 2
-  **
-12**  5
-  ******
-  ******
-      **6
-      **
-  ******
- 8******
-     7
-**/
-        PathElement(E,6), //1
-        PathElement(S,2), //2
-        PathElement(W,4), //3
-        PathElement(S,2), //4
-        PathElement(E,4), //5
-        PathElement(S,6), //6
-        PathElement(W,6), //7
-        PathElement(N,2), //8
-        PathElement(E,4), //9
-        PathElement(N,2), //10
-        PathElement(W,4), //11
-        PathElement(N,6), //12
-};
-/**
+    return result;
+}
 
-   1
-  ****** 2
-  ******
-  **
-  **  5
-  ******
-8 ******
-  **  ** 6
-  **  **
-  ******
-  ******
-  7
-**/
-PathElement six_path[] = {
-        PathElement(E,6), //1
-        PathElement(S,2), //2
-        PathElement(W,4), //3
-        PathElement(S,2), //4
-        PathElement(E,4), //5
-        PathElement(S,6), //6
-        PathElement(W,6), //7
-        PathElement(N,10) //8
-};
+char guessChain(string chainCode){
+    vector<Knowledge> knowledge = createKnowledge();
 
-/**
-  1
-  ******
- 6******
-      **
-    4 ** 2
-      **
-      **
-      3
-**/
+    char currentChar = knowledge[0].meaning;
+    float currentMax = calculateChain(knowledge[0].data, chainCode);
+    for (int i = 1 ; i < knowledge.size(); i++){
+        float rate = calculateChain(knowledge[i].data, chainCode);
+        if (rate > currentMax){
+            currentMax = rate;
+            currentChar = knowledge[i].meaning;
+        }
+    }
 
-PathElement seven_path[] = {
-        PathElement(E,6), //1
-        PathElement(S,6), //2
-        PathElement(W,2), //3
-        PathElement(N,4), //4
-        PathElement(W,4), //5
-        PathElement(N,2) //6
-};
+    return currentChar;
+}
 
-/**
-    1
- ******
- ******
- **  **
-8**  ** 2
- ******
- ******
-     **
-  5  **
-4******
- ******
-    3
-**/
-PathElement nine_path[] = {
-        PathElement(E,6), //1
-        PathElement(S,10),//2
-        PathElement(W,6),//3
-        PathElement(N,2),//4
-        PathElement(E,4),//5
-        PathElement(N,2),//6
-        PathElement(W,4),//7
-        PathElement(N,6),//8
-
-};
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -773,30 +499,6 @@ PathElement nine_path[] = {
 JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap){
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
     bool **image;
-
-    vector<Number> numbers;
-    numbers.push_back(Number(0,4,zero_path));
-    //satu gak dimasukin. masih ngebug.
-    //numbers.push_back(Number(1,4,one_path));
-    numbers.push_back(Number(2,12,two_path));
-    numbers.push_back(Number(5,12,five_path));
-    numbers.push_back(Number(4,10,four_path));
-    numbers.push_back(Number(3,12,three_path));
-    numbers.push_back(Number(6,8,six_path));
-    numbers.push_back(Number(7,6,seven_path));
-    numbers.push_back(Number(9,8,nine_path));
-//    numbers.push_back( Number(1, 49,path_satu) );
-//    numbers.push_back( Number(2, 168,path_dua) );
-//    numbers.push_back( Number(3, 164,path_tiga) );
-//    numbers.push_back( Number(4, 64,path_empat) );
-//    numbers.push_back( Number(5, 103,path_lima) );
-//    numbers.push_back( Number(6, 118,path_enam) );
-//    numbers.push_back( Number(7, 105,path_tujuh) );
-//    numbers.push_back( Number(8, 144,path_delapan) );
-//    numbers.push_back( Number(9, 132,path_sembilan) );
-//    numbers.push_back( Number(0, 100,path_nol) );
-//    numbers.push_back( Number(11, 22,path_tambah) );
-//    numbers.push_back( Number(12, 10,path_kurang) );
 
     image = new bool*[nativeBitmap->bitmapInfo.height];
     for (int i=0;i<nativeBitmap->bitmapInfo.height;i++) {
@@ -809,33 +511,48 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
         }
     }
 
+    vector<DetectedChar> interpretation;
     vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
     delete nativeBitmap;
 
-    string hasil;
 
     for (int i=0;i<border_infos.size();i++) {
         BorderInfo border_info = border_infos[i];
+        stringstream sskode;
 
-        int ukuran = border_info.chain_codes.size();
-        stringstream ss;
-
-        short* test = new short[ukuran];
         for (int j=0;j<border_info.chain_codes.size();j++) {
-            test[j] = border_info.chain_codes[j];
-            //ss << border_info.chain_codes[j];
-            //LOGD("%d \n", border_info.chain_codes[j]);
-            //cout<<border_info.chain_codes[j]<<endl;
+            sskode << border_info.chain_codes[j];
         }
-        ss << match_chain_code(test,ukuran,numbers, numbers.size());
-        hasil = ss.str();
-        //LOGD("KIRA KIRA = %d \n", match_chain_code(test,ukuran,numbers, numbers.size()));
+
+        DetectedChar detectedChar;
+        detectedChar.start = border_info.start_point.x;
+        detectedChar.value = guessChain(sskode.str());
+        interpretation.push_back(detectedChar);
+
+        //ss << guessChain(sskode.str());
+        // LOGD("CHAIN CODE: %s", sskode.str().c_str());
+        // LOGD("KIRA KIRA = %d \n", match_chain_code(test,ukuran,numbers, numbers.size()));
 
     }
 
 
+    stringstream ss;
+
+    while(interpretation.size() > 0){
+        int minValue = interpretation[0].start;
+        int currentMin = 0;
+        for (int i = 1; i < interpretation.size(); i++){
+            if (interpretation[i].start < minValue){
+                minValue = interpretation[i].start;
+                currentMin = i;
+            }
+        }
+        ss << interpretation[currentMin].value;
+        interpretation.erase(interpretation.begin() + currentMin);
+    }
+
     // [1] adalah ekspresi input, [2] adalah hasil perhitungan
-    std::string tes[] = { hasil.c_str(), "44" };
+    std::string tes[] = { ss.str().c_str(), "44" };
     jobjectArray hasil2 = createJavaArray(env, 2, tes);
 
     return hasil2;
