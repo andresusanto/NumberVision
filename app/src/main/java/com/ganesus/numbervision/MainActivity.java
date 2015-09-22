@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
         String hasil = detectAll(BitmapFactory.decodeFile(path))[0];
 
         Bitmap.Config conf = Bitmap.Config.ARGB_8888;
-        Bitmap canvas = Bitmap.createBitmap(866, 200, conf);
+        Bitmap canvas = Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), conf);
 
         Bitmap hh = preProses(bmp, canvas);
 
