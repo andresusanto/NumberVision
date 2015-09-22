@@ -24,13 +24,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void prosesBitmap(String path){
+        //Bitmap bmp = Bitmap.createBitmap(BitmapFactory.decodeFile(path), 18, 37, 918, 128);
+        Bitmap bmp = BitmapFactory.decodeFile(path);
+
         String hasil = detectAll(BitmapFactory.decodeFile(path))[0];
+
+        Bitmap.Config conf = Bitmap.Config.ARGB_8888;
+        Bitmap canvas = Bitmap.createBitmap(866, 200, conf);
+
+        Bitmap hh = preProses(bmp, canvas);
 
         TextView tv = (TextView) findViewById(R.id.txtInterpretasi);
         tv.setText(hasil);
 
         ImageView iv = (ImageView) findViewById(R.id.imageView);
-        iv.setImageBitmap(BitmapFactory.decodeFile(path));
+        iv.setImageBitmap(hh);
+        //iv.setImageBitmap(BitmapFactory.decodeFile(path));
     }
 
     @Override
@@ -65,6 +74,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public native String[] detectAll(Bitmap bitmap);
+    public native Bitmap preProses(Bitmap bitmap, Bitmap canvas);
 
     static {
         System.loadLibrary("numbervision");

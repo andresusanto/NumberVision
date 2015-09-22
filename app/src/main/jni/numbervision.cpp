@@ -21,11 +21,13 @@
 #define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 
 #define STABILIZATION_FACTOR 4 // faktor untuk stabilisasi (copot noise dari chain code)
+#define NOT_SPECIFIED_COLOR -1
 
 // supaya bisa dipanggil sama java
 extern "C"
 {
     JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap);
+    JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas);
 }
 
 
@@ -97,6 +99,26 @@ void convertIntToArgb(uint32_t pixel, ARGB* argb){
     argb->alpha = ((pixel >> 24) & 0xff);
 }
 
+NativeBitmap* grayscaleBitmap(NativeBitmap* source){
+    NativeBitmap* result = new NativeBitmap(source);
+    uint32_t nBitmapSize = source->bitmapInfo.height * source->bitmapInfo.width;
+
+
+    for (uint32_t i = 0; i < nBitmapSize; i++){
+        ARGB bitmapColor;
+        convertIntToArgb(source->pixels[i], &bitmapColor);
+
+        uint8_t grayscaleColor = (int)(0.2989f * bitmapColor.red + 0.5870f * bitmapColor.green + 0.1141 * bitmapColor.blue);
+
+        bitmapColor.red = grayscaleColor;
+        bitmapColor.green = grayscaleColor;
+        bitmapColor.blue = grayscaleColor;
+
+        result->pixels[i] = convertArgbToInt(bitmapColor);
+    }
+
+    return result;
+}
 
 NativeBitmap* convertBitmapToNative(JNIEnv * env, jobject bitmap){
     AndroidBitmapInfo bitmapInfo;
@@ -277,6 +299,7 @@ void erase_image(Point start_point,
 vector<int> get_chain_codes(Point start_point,
                             bool **image,int length,int height) {
 
+
     vector<int> chain_codes;
 
     Point current_black = start_point;
@@ -291,7 +314,6 @@ vector<int> get_chain_codes(Point start_point,
     Point traverse_point = current_white;
     Point traverse_point_prev = current_white;
     while (true) {
-
 
         traverse_point_prev = traverse_point;
         traverse_point = get_next_traverse_point(current_black, traverse_point);
@@ -343,6 +365,119 @@ vector<BorderInfo> get_border_infos(bool **image,int length,int height) {
     return border_infos;
 }
 
+float generateOtsu(uint32_t* histogram, uint32_t total) {
+    int sum = 0;
+    for (int i=1;i<256; ++i) sum+= i *histogram[i];
+
+    int sumB = 0;
+    int wB = 0;
+    int wF = 0;
+    int mB = 0;
+    int mF = 0;
+    float max = 0.0f;
+    float between = 0.0f;
+    float threshold1 = 0.0f;
+    float threshold2 = 0.0f;
+
+    for (int i=0;i<256;++i) {
+        wB += histogram[i];
+        if (wB == 0) continue;
+        wF = total - wB;
+        if (wF == 0) break;
+
+        sumB += i * histogram[i];
+
+        mB = sumB / wB;
+        mF = (sum - sumB) /wF;
+
+        between = wB * wF * (mB - mF) * (mB - mF);
+        if (between >= max) {
+            threshold1 = i;
+            if ( between > max ) {
+                threshold2 = i;
+            }
+            max = between;
+        }
+    }
+
+    return (threshold1 + threshold2) / 2.0f;
+}
+
+
+uint32_t* get_cumulative_histogram(uint32_t* histogram) {
+
+    uint32_t* cumulative_histogram = new uint32_t[256];
+
+    int accumulation = 0;
+    for (int i=0; i<256; i++) {
+        accumulation += histogram[i];
+        cumulative_histogram[i] = accumulation;
+    }
+
+    return cumulative_histogram;
+}
+
+int get_lower_bound(uint32_t* histogram) {
+    for (int i=0;i<256;i++) {
+        if (histogram[i] !=0) {
+            return i;
+        }
+    }
+    return NOT_SPECIFIED_COLOR;
+}
+
+int get_upper_bound(uint32_t* histogram) {
+    for (int i= 255; i>=0; i--) {
+        if (histogram[i] !=0) {
+            return i;
+        }
+    }
+
+    return NOT_SPECIFIED_COLOR;
+}
+
+uint32_t* cumulative_equalization(uint32_t* histogram) {
+
+    uint32_t* color_transform = new uint32_t[256];
+    uint32_t* cumulative_histogram = get_cumulative_histogram(histogram);
+
+    int lower_bound = get_lower_bound(histogram);
+    int upper_bound = get_upper_bound(histogram);
+
+    for (int i=0; i<256; i++) {
+        color_transform[i] = NOT_SPECIFIED_COLOR;
+    }
+
+    int total_pixels = cumulative_histogram[upper_bound];
+    int denominator = total_pixels - cumulative_histogram[lower_bound];
+    for (int i=lower_bound;i<=upper_bound;i++) {
+        if (histogram[i])
+            color_transform[i] = ((cumulative_histogram[i] - cumulative_histogram[lower_bound]) *
+                                  (254) / denominator) + 1;
+    }
+
+    return color_transform;
+}
+
+NativeBitmap* transformNativeBitmap(NativeBitmap* source, uint32_t* transform){
+    NativeBitmap* result = new NativeBitmap(source);
+    uint32_t nBitmapSize = source->bitmapInfo.height * source->bitmapInfo.width;
+
+
+    for (uint32_t i = 0; i < nBitmapSize; i++){
+        ARGB bitmapColor;
+        convertIntToArgb(source->pixels[i], &bitmapColor);
+
+        bitmapColor.red = transform[bitmapColor.red];
+        bitmapColor.green = transform[bitmapColor.green];
+        bitmapColor.blue = transform[bitmapColor.blue];
+
+        result->pixels[i] = convertArgbToInt(bitmapColor);
+    }
+
+    delete[] transform;
+    return result;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // ALGORITMA MATCHER
@@ -386,6 +521,26 @@ vector<ECode> stabileData(string original){
     }*/
 
     return training;
+}
+
+uint32_t* createHistogram(NativeBitmap* nBitmap){
+    if (nBitmap->pixels == NULL)
+        return NULL;
+
+    uint32_t* result = new uint32_t[256];
+
+    for (int i=0; i<256; i++)
+        result[i] = 0;
+
+    uint32_t nBitmapSize = nBitmap->bitmapInfo.height * nBitmap->bitmapInfo.width;
+
+    for (uint32_t i = 0; i < nBitmapSize; i++){
+        ARGB bitmapColor;
+        convertIntToArgb(nBitmap->pixels[i], &bitmapColor);
+        result[bitmapColor.red]++;
+    }
+
+    return result;
 }
 
 float calculateChain (string strKnowledge, string strTest ){
@@ -492,15 +647,81 @@ char guessChain(string chainCode){
     return currentChar;
 }
 
+
+bool** convertToBoolmage(NativeBitmap* nativeBitmap){
+    bool** image = new bool*[nativeBitmap->bitmapInfo.height];
+    NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
+
+    uint32_t nBitmapSize = pBitmap->bitmapInfo.height * pBitmap->bitmapInfo.width;
+    uint32_t* histogram = createHistogram(pBitmap);
+    uint32_t* color_transform = cumulative_equalization(histogram);
+
+    NativeBitmap* gBitmap = transformNativeBitmap(pBitmap, color_transform);
+    delete pBitmap;
+
+    histogram = createHistogram(gBitmap);
+
+    float otsu = generateOtsu(histogram, nBitmapSize);
+
+    for (int i=0;i<gBitmap->bitmapInfo.height;i++) {
+        image[i] = new bool[gBitmap->bitmapInfo.width];
+        for (int j=0;j<gBitmap->bitmapInfo.width;j++) {
+            ARGB warna;
+            convertIntToArgb(gBitmap->pixels[i * gBitmap->bitmapInfo.width + j], &warna);
+
+            image[i][j] = (warna.red > otsu);
+/*
+            if (warna.red > otsu)
+                LOGD("image[%d][%d] = true;", i, j);
+            else
+                LOGD("image[%d][%d] = false;", i, j);*/
+        }
+    }
+
+    return image;
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////
+
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas){
+    NativeBitmap* nCanvas = convertBitmapToNative(env, canvas);
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
+    delete  nativeBitmap;
+
+    uint32_t nBitmapSize = pBitmap->bitmapInfo.height * pBitmap->bitmapInfo.width;
+    uint32_t* histogram = createHistogram(pBitmap);
+    uint32_t* color_transform = cumulative_equalization(histogram);
+
+    NativeBitmap* gBitmap = transformNativeBitmap(pBitmap, color_transform);
+    delete pBitmap;
+    delete histogram;
+    histogram = createHistogram(gBitmap);
+
+    float otsu = generateOtsu(histogram, nBitmapSize);
+
+    ARGB aGray;
+    aGray.red = 127; aGray.green = 127; aGray.blue = 127; aGray.alpha = 255;
+    uint32_t iGray= convertArgbToInt(aGray);
+
+    for (uint32_t i = 0; i < nBitmapSize; i++){
+        ARGB bitmapColor;
+        convertIntToArgb(gBitmap->pixels[i], &bitmapColor);
+
+        if (bitmapColor.red > otsu){
+            nCanvas->pixels[i] = iGray;
+        }
+    }
+
+    return convertNativeToBitmap(env, nCanvas);
+}
 
 
 JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap){
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
-    bool **image;
+    bool **image = convertToBoolmage(nativeBitmap);
 
-    image = new bool*[nativeBitmap->bitmapInfo.height];
+    /*image = new bool*[nativeBitmap->bitmapInfo.height];
     for (int i=0;i<nativeBitmap->bitmapInfo.height;i++) {
         image[i] = new bool[nativeBitmap->bitmapInfo.width];
         for (int j=0;j<nativeBitmap->bitmapInfo.width;j++) {
@@ -509,12 +730,12 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
 
             image[i][j] = !(warna.blue == 255 && warna.green == 255 && warna.red == 255);
         }
-    }
+    }*/
 
     vector<DetectedChar> interpretation;
     vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
     delete nativeBitmap;
-
+/*
 
     for (int i=0;i<border_infos.size();i++) {
         BorderInfo border_info = border_infos[i];
@@ -551,8 +772,9 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
         interpretation.erase(interpretation.begin() + currentMin);
     }
 
-    // [1] adalah ekspresi input, [2] adalah hasil perhitungan
-    std::string tes[] = { ss.str().c_str(), "44" };
+    // [1] adalah ekspresi input, [2] adalah hasil perhitungan*/
+    std::string tes[] = { "11", "44" };
+    //std::string tes[] = { ss.str().c_str(), "44" };
     jobjectArray hasil2 = createJavaArray(env, 2, tes);
 
     return hasil2;
