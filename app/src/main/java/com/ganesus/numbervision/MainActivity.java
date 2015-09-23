@@ -1,6 +1,8 @@
 package com.ganesus.numbervision;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -14,9 +16,30 @@ import android.widget.TextView;
 
 import org.w3c.dom.Text;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
 public class MainActivity extends AppCompatActivity {
 
     private static final int RESULT_LOAD_IMAGE = 635;
+    private static String KNOWLEDGE_PATH = "";
+
+    public static File copyResource (Resources r, int rsrcId, File dstFile) throws IOException
+    {
+        InputStream is =  r.openRawResource(rsrcId);
+        FileOutputStream os = new FileOutputStream(dstFile);
+
+        byte[] buffer = new byte[4096];
+        int bytesRead;
+        while ((bytesRead = is.read(buffer)) != -1)
+            os.write(buffer, 0, bytesRead);
+        is.close();
+        os.close();
+
+        return dstFile;
+    }
 
     public void klikGallery(View v){
         Intent i = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -24,7 +47,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void prosesBitmap(String path){
-        //Bitmap bmp = Bitmap.createBitmap(BitmapFactory.decodeFile(path), 18, 37, 918, 128);
         Bitmap bmp = BitmapFactory.decodeFile(path);
 
         if (bmp.getWidth() == 1632){
@@ -33,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
             bmp = Bitmap.createBitmap(bmp, 345, 323, 390, 107);
         }
 
-        String hasil = detectAll(bmp)[0];
+        String hasil = detectAll(bmp, KNOWLEDGE_PATH)[0];
 
         Bitmap.Config conf = Bitmap.Config.ARGB_8888;
         Bitmap canvas = Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), conf);
@@ -45,7 +67,6 @@ public class MainActivity extends AppCompatActivity {
 
         ImageView iv = (ImageView) findViewById(R.id.imageView);
         iv.setImageBitmap(hh);
-        //iv.setImageBitmap(BitmapFactory.decodeFile(path));
     }
 
     @Override
@@ -53,8 +74,15 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        File dstDir = getDir("data", Context.MODE_PRIVATE);
+        File knowledgeFile = new File(dstDir, "knowledge.txt");
 
-
+        try {
+            copyResource(getResources(), R.raw.knowledge, knowledgeFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        KNOWLEDGE_PATH = knowledgeFile.getAbsolutePath();
     }
 
     @Override
@@ -79,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public native String[] detectAll(Bitmap bitmap);
+    public native String[] detectAll(Bitmap bitmap, String knowledge);
     public native Bitmap preProses(Bitmap bitmap, Bitmap canvas);
 
     static {
