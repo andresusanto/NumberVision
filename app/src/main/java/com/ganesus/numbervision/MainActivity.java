@@ -27,7 +27,13 @@ public class MainActivity extends AppCompatActivity {
         //Bitmap bmp = Bitmap.createBitmap(BitmapFactory.decodeFile(path), 18, 37, 918, 128);
         Bitmap bmp = BitmapFactory.decodeFile(path);
 
-        String hasil = detectAll(BitmapFactory.decodeFile(path))[0];
+        if (bmp.getWidth() == 1632){
+            bmp = Bitmap.createBitmap(bmp, 546, 491, 549, 115);
+        }else if(bmp.getWidth() == 1024){
+            bmp = Bitmap.createBitmap(bmp, 345, 323, 390, 107);
+        }
+
+        String hasil = detectAll(bmp)[0];
 
         Bitmap.Config conf = Bitmap.Config.ARGB_8888;
         Bitmap canvas = Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), conf);
