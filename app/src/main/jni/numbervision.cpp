@@ -33,11 +33,11 @@
 #define LEFT 'L'
 
 //subchain code data yang diambil
-#define LENGTH_TAKE 10
+#define LENGTH_TAKE 30
 //derajat minimal agar dia dikatakan belok
-#define MIN_D 30.0
+#define MIN_D 50.0
 //derajat maximal agar dia dikatakan belok
-#define MAX_D 100.0
+#define MAX_D 90.0
 //maximal banyak kode belok
 #define MAX_TURN_CODE 50
 
@@ -589,12 +589,15 @@ string generate_turn(const string &code){
 
 int edit_distance(const string& a,const string& b){
     int dp[MAX_TURN_CODE][MAX_TURN_CODE];
+
     for(int ia = 1; ia <= (int) a.size(); ia++){
         dp[ia][0] = ia;
+
     }
     for(int ib = 1; ib <= (int) b.size(); ib++){
         dp[0][ib] = ib;
     }
+
     for(int ia = 1; ia <= (int) a.size(); ia++){
         for(int ib = 1; ib <= (int) b.size(); ib++){
             if (a[ia - 1] == b[ib- 1]){
@@ -627,9 +630,6 @@ vector<char> predict(const string& chain_code,const vector<Train>& trains){
     return probabilities;
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-// VOTING?
-//////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // ALGORITMA MATCHER
@@ -741,19 +741,15 @@ float calculateChain (string strKnowledge, string strTest ){
     return currentScore;
 }
 
-vector<Knowledge> createKnowledge(const char* path){
-    vector<Knowledge> result;
+vector<Train> createKnowledge(const char* path){
+    vector<Train> result;
     LOGD("Loaded Knowledge File %s", path);
     ifstream infile(path);
 
     char tmp_char; string tmp_string;
     while (infile >> tmp_char >> tmp_string)
     {
-        Knowledge tmp_knowledge;
-        tmp_knowledge.meaning = tmp_char;
-        tmp_knowledge.data = tmp_string;
-
-        result.push_back(tmp_knowledge);
+        result.push_back(Train(tmp_char, tmp_string));
     }
 
     return result;
@@ -771,6 +767,8 @@ char guessChain(string chainCode, vector<Knowledge> knowledge){
             currentChar = knowledge[i].meaning;
         }
     }
+
+    if (currentMax < 1) return ' ';
 
     return currentChar;
 }
@@ -830,6 +828,12 @@ bool** convertToBoolmage(NativeBitmap* nativeBitmap){
 
     return image;
 }
+
+///////////////////////////////////////////////////////////////////////////////////
+// VOTING?
+//////////////////////////////////////////////////////////////////////////////////
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -871,7 +875,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
     bool **image = convertToBoolmage(nativeBitmap);
     const char* path_knowledge = env->GetStringUTFChars( path , NULL ) ;
-    vector<Knowledge> knowledge = createKnowledge(path_knowledge);
+    vector<Train> train = createKnowledge(path_knowledge);
 
     vector<DetectedChar> interpretation;
     vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
@@ -888,16 +892,24 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
         }
 
         if (border_info.chain_codes.size() > TRESHOLD_ERROR) {
+            string turns = generate_turn(sskode.str());
+
+            vector<char> predictions = predict(turns, train);
+
             DetectedChar detectedChar;
             detectedChar.start = border_info.start_point.x;
-            detectedChar.value = guessChain(sskode.str(), knowledge);
+            detectedChar.value = predictions[0]; //guessChain(sskode.str(), knowledge);
 
             sskode << endl;
             detectedChar.chain = sskode.str();
             interpretation.push_back(detectedChar);
+
+            //LOGD("%d, %d CHAIN CODE: %s", border_info.start_point.x, border_info.start_point.y, sskode.str().c_str());
+            LOGD("%s", turns.c_str());
+
         }
         //ss << guessChain(sskode.str());
-        //LOGD("CHAIN CODE: %s", sskode.str().c_str());
+
 
         //sskode << endl;
         //fputs(sskode.str().c_str(), file);
