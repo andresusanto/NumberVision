@@ -47,13 +47,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void prosesBitmap(String path){
+        Bitmap merek = null;
         Bitmap bmp = BitmapFactory.decodeFile(path);
 
         if (bmp.getWidth() == 1632){
+            merek = Bitmap.createBitmap(bmp, 644, 303, 346, 112);
             bmp = Bitmap.createBitmap(bmp, 546, 491, 549, 115);
         }else if(bmp.getWidth() == 1024){
             bmp = Bitmap.createBitmap(bmp, 345, 323, 390, 107);
+        }else if(bmp.getWidth() == 1019){
+            merek = Bitmap.createBitmap(bmp, 382, 302, 247, 93);
+            bmp = Bitmap.createBitmap(bmp, 341, 438, 332, 55);
         }
+
+
 
         String hasil = detectAll(bmp, KNOWLEDGE_PATH)[0];
 
@@ -61,6 +68,28 @@ public class MainActivity extends AppCompatActivity {
         Bitmap canvas = Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), conf);
 
         Bitmap hh = preProses(bmp, canvas);
+
+        if (merek != null){
+            Bitmap p_merek = preProses(bmp, canvas);
+
+            Bitmap.Config conf_merek = Bitmap.Config.ARGB_8888;
+            Bitmap canvas_merek = Bitmap.createBitmap(merek.getWidth(), merek.getHeight(), conf_merek);
+            Bitmap hmerek = preProses(merek, canvas_merek);
+
+            ImageView iv_merek = (ImageView) findViewById(R.id.imageView2);
+            iv_merek.setImageBitmap(hmerek);
+
+            String merekmobil = detectMerek(merek)[0];
+            TextView tv = (TextView) findViewById(R.id.txtPerhitungan);
+            tv.setText(merekmobil);
+
+        }else{
+            ImageView iv_merek = (ImageView) findViewById(R.id.imageView2);
+            iv_merek.setImageBitmap(null);
+
+            TextView tv = (TextView) findViewById(R.id.txtPerhitungan);
+            tv.setText("Tidak diketahui");
+        }
 
         TextView tv = (TextView) findViewById(R.id.txtInterpretasi);
         tv.setText(hasil);
@@ -108,6 +137,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public native String[] detectAll(Bitmap bitmap, String knowledge);
+    public native String[] detectMerek(Bitmap bitmap);
     public native Bitmap preProses(Bitmap bitmap, Bitmap canvas);
 
     static {

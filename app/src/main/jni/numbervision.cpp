@@ -46,6 +46,7 @@ extern "C"
 {
     JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path);
     JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas);
+    JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectMerek (JNIEnv * env, jobject obj, jobject bitmap);
 }
 
 
@@ -741,15 +742,20 @@ float calculateChain (string strKnowledge, string strTest ){
     return currentScore;
 }
 
-vector<Train> createKnowledge(const char* path){
-    vector<Train> result;
+vector<Knowledge> createKnowledge(const char* path){
+    vector<Knowledge> result;
     LOGD("Loaded Knowledge File %s", path);
     ifstream infile(path);
 
     char tmp_char; string tmp_string;
     while (infile >> tmp_char >> tmp_string)
     {
-        result.push_back(Train(tmp_char, tmp_string));
+        Knowledge tmp_knowledge;
+        tmp_knowledge.meaning = tmp_char;
+        tmp_knowledge.data = tmp_string;
+
+        result.push_back(tmp_knowledge);
+        //result.push_back(Train(tmp_char, tmp_string));
     }
 
     return result;
@@ -767,8 +773,6 @@ char guessChain(string chainCode, vector<Knowledge> knowledge){
             currentChar = knowledge[i].meaning;
         }
     }
-
-    if (currentMax < 1) return ' ';
 
     return currentChar;
 }
@@ -875,7 +879,8 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
     bool **image = convertToBoolmage(nativeBitmap);
     const char* path_knowledge = env->GetStringUTFChars( path , NULL ) ;
-    vector<Train> train = createKnowledge(path_knowledge);
+    vector<Knowledge> knowledge = createKnowledge(path_knowledge);
+    //vector<Train> train = createKnowledge(path_knowledge);
 
     vector<DetectedChar> interpretation;
     vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
@@ -894,18 +899,18 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
         if (border_info.chain_codes.size() > TRESHOLD_ERROR) {
             string turns = generate_turn(sskode.str());
 
-            vector<char> predictions = predict(turns, train);
+            //vector<char> predictions = predict(turns, train);
 
             DetectedChar detectedChar;
             detectedChar.start = border_info.start_point.x;
-            detectedChar.value = predictions[0]; //guessChain(sskode.str(), knowledge);
+            detectedChar.value = guessChain(sskode.str(), knowledge);
 
             sskode << endl;
             detectedChar.chain = sskode.str();
             interpretation.push_back(detectedChar);
 
             //LOGD("%d, %d CHAIN CODE: %s", border_info.start_point.x, border_info.start_point.y, sskode.str().c_str());
-            LOGD("%s", turns.c_str());
+            //LOGD("%s", turns.c_str());
 
         }
         //ss << guessChain(sskode.str());
@@ -938,6 +943,87 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     fclose(file);
 
     // [1] adalah ekspresi input, [2] adalah hasil perhitungan*/
+    std::string tes[] = { ss.str().c_str(), "44" };
+    //std::string tes[] = { ss.str().c_str(), "44" };
+    jobjectArray hasil2 = createJavaArray(env, 2, tes);
+
+    return hasil2;
+}
+
+JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectMerek (JNIEnv * env, jobject obj, jobject bitmap){
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    bool **image = convertToBoolmage(nativeBitmap);
+    //vector<Train> train = createKnowledge(path_knowledge);
+
+    vector<Train> trains;
+    trains.push_back(Train('0',"RRRR"));
+    trains.push_back(Train('1',"RLRLLLLRRLLLRRRLLLLRLLRRLRLLLRLLR"));
+
+    vector<DetectedChar> interpretation;
+    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
+    delete nativeBitmap;
+
+    //FILE* file = fopen("/sdcard/textTest.txt","w+");
+
+    for (int i=0;i<border_infos.size();i++) {
+        BorderInfo border_info = border_infos[i];
+        stringstream sskode;
+
+        for (int j = 0; j < border_info.chain_codes.size(); j++) {
+            sskode << border_info.chain_codes[j];
+        }
+
+        if (border_info.chain_codes.size() > TRESHOLD_ERROR) {
+            string turns = generate_turn(sskode.str());
+            vector<char> predictions = predict(turns, trains);
+
+            DetectedChar detectedChar;
+            detectedChar.start = border_info.start_point.x;
+            detectedChar.value = predictions[0]; //guessChain(sskode.str(), knowledge);
+
+            sskode << endl;
+            detectedChar.chain = sskode.str();
+            interpretation.push_back(detectedChar);
+
+            //LOGD("%d, %d CHAIN CODE: %s", border_info.start_point.x, border_info.start_point.y, sskode.str().c_str());
+            //LOGD("%s", turns.c_str());
+
+        }
+        //ss << guessChain(sskode.str());
+
+
+        //sskode << endl;
+        //fputs(sskode.str().c_str(), file);
+
+    }
+    //fclose(file);
+
+    stringstream ss;
+
+    //FILE* file = fopen("/sdcard/textTest.txt","w+");
+
+    while(interpretation.size() > 0){
+        int minValue = interpretation[0].start;
+        int currentMin = 0;
+        for (int i = 1; i < interpretation.size(); i++){
+            if (interpretation[i].start < minValue){
+                minValue = interpretation[i].start;
+                currentMin = i;
+            }
+        }
+        //fputs(interpretation[currentMin].chain.c_str(), file);
+        ss << interpretation[currentMin].value;
+        interpretation.erase(interpretation.begin() + currentMin);
+
+    }
+    //fclose(file);
+
+    // [1] adalah ekspresi input, [2] adalah hasil perhitungan*/
+    if (ss.str() == "0"){
+        ss.str("HONDA");
+    }else if (ss.str() == "1"){
+        ss.str("TOYOTA");
+    }
     std::string tes[] = { ss.str().c_str(), "44" };
     //std::string tes[] = { ss.str().c_str(), "44" };
     jobjectArray hasil2 = createJavaArray(env, 2, tes);

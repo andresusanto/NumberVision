@@ -28,7 +28,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceSmall"
-        android:text="Interpretasi:"
+        android:text="Plat Nomor:"
         android:id="@+id/textView2"
         android:layout_marginTop="24dp"
         android:layout_below="@+id/button"
@@ -39,13 +39,13 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceSmall"
-        android:text="Hasil Perhitungan:"
+        android:text="Merek:"
         android:id="@+id/textView3"
         android:layout_below="@+id/textView2"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
         android:layout_marginTop="21dp"
-        android:visibility="invisible" />
+        android:visibility="visible" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -70,12 +70,21 @@
 
     <ImageView
         android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
+        android:layout_height="150dp"
         android:id="@+id/imageView"
         android:layout_below="@+id/textView3"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
         android:layout_marginTop="20dp"
+        android:adjustViewBounds="true" />
+
+    <ImageView
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:id="@+id/imageView2"
+        android:layout_below="@+id/imageView"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
         android:adjustViewBounds="true" />
 
 </RelativeLayout>
