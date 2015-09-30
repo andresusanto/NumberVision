@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        String hasil = detectAll(bmp, KNOWLEDGE_PATH)[0];
+        String hasil[] = detectAll(bmp, KNOWLEDGE_PATH);
 
         Bitmap.Config conf = Bitmap.Config.ARGB_8888;
         Bitmap canvas = Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), conf);
@@ -79,9 +79,9 @@ public class MainActivity extends AppCompatActivity {
             ImageView iv_merek = (ImageView) findViewById(R.id.imageView2);
             iv_merek.setImageBitmap(hmerek);
 
-            String merekmobil = detectMerek(merek)[0];
+            String merekmobil[] = detectMerek(merek);
             TextView tv = (TextView) findViewById(R.id.txtPerhitungan);
-            tv.setText(merekmobil);
+            tv.setText(merekmobil[0] + "(" + merekmobil[1] + ")");
 
         }else{
             ImageView iv_merek = (ImageView) findViewById(R.id.imageView2);
@@ -92,7 +92,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         TextView tv = (TextView) findViewById(R.id.txtInterpretasi);
-        tv.setText(hasil);
+        tv.setText(hasil[0]);
+
+        TextView tv2 = (TextView) findViewById(R.id.txtKodeBelok);
+        tv2.setText(hasil[1]);
+
+
 
         ImageView iv = (ImageView) findViewById(R.id.imageView);
         iv.setImageBitmap(hh);
