@@ -15,7 +15,7 @@
 #include <queue>
 #include <sstream>
 #include <fstream>
-
+#include <unistd.h>
 
 #define  LOG_TAG    "NUMBER VISION"
 #define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
@@ -24,6 +24,8 @@
 #define STABILIZATION_FACTOR 4 // faktor untuk stabilisasi (copot noise dari chain code)
 #define NOT_SPECIFIED_COLOR -1
 #define TRESHOLD_ERROR 70
+#define CHUNK_BAR 5 //mxn ke 5x5
+#define TRESHOLD_BLACK 0.5 //minimum value to be perceived as black
 
 #define E '0'
 #define S '2'
@@ -374,9 +376,7 @@ vector<int> get_chain_codes(Point start_point,
 
         }
     }
-
     return chain_codes;
-
 }
 
 Point get_start_point(bool **image, int length,int height) {
@@ -812,7 +812,6 @@ char guessChain(string chainCode, vector<Knowledge> knowledge){
     return currentChar;
 }
 
-
 bool** convertToBoolmage(NativeBitmap* nativeBitmap){
     bool** image = new bool*[nativeBitmap->bitmapInfo.height];
     NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
@@ -868,6 +867,160 @@ bool** convertToBoolmage(NativeBitmap* nativeBitmap){
     return image;
 }
 
+/*typedef struct border_info{
+    Point start_point;
+    vector<int> chain_codes;
+}BorderInfo;*/
+
+Point chcodeToPoint(Point start,int chcode){
+    switch(chcode) {
+        case 0:
+            return Point(start.x+1,start.y);
+            break;
+        case 1:
+            return Point(start.x+1,start.y+1);
+            break;
+        case 2:
+            return Point(start.x,start.y+1);
+            break;
+        case 3:
+            return Point(start.x-1,start.y+1);
+            break;
+        case 4:
+            return Point(start.x-1,start.y);
+            break;
+        case 5:
+            return Point(start.x-1,start.y-1);
+            break;
+        case 6:
+            return Point(start.x,start.y-1);
+            break;
+        case 7:
+            return Point(start.x+1,start.y-1);
+            break;
+        default:
+            return Point(-1,-1);
+            break;
+    }
+}
+//Single digit to NxN
+bool** singleToNxN(BorderInfo input,bool** image_copy){
+    vector<int> *temp=&(input.chain_codes);
+    vector<int>::iterator it;
+    int up=input.start_point.y,bottom=input.start_point.y,right=input.start_point.x,left=input.start_point.x;
+    Point nextP=input.start_point;
+    //Find rectangle that includes the number
+    for(it=temp->begin();it!=temp->end();it++){
+        nextP=chcodeToPoint(nextP,(*it));
+        if(nextP.x>right) right=nextP.x;
+        else if(nextP.x<left) left=nextP.x;
+        if(nextP.y>up) up=nextP.y;
+        else if(nextP.y<bottom) bottom=nextP.y;
+    }
+    int width=right-left+1;
+    int height=up-bottom+1;
+    bool** array=new bool*[CHUNK_BAR];
+    for(int i=0;i<CHUNK_BAR;i++)array[i]=new bool[CHUNK_BAR];
+    //Init elemen array to 0
+    for(int i=0;i<CHUNK_BAR;i++)
+        for(int j=0;j<CHUNK_BAR;j++)
+            array[i][j]=false;
+    //mxn to 5x5
+    for(int i=left;i<=right;i+=width/CHUNK_BAR){
+        for(int j=bottom;j<=up;j+=height/CHUNK_BAR){
+            //Check majority of black
+            int counter=0;
+            int black=0;
+            for(int n=i;n<=i+(width/CHUNK_BAR)-1 && n<=right;n++)
+                for(int m=j;m<=j+(height/CHUNK_BAR)-1 && m<=up;m++) {
+                    if (image_copy[n][m] == true) black++;
+                    counter++;
+                }
+            //calculate percentage of black
+            float percent=(float)black/counter;
+            if(percent>TRESHOLD_BLACK) array[(i-left)*CHUNK_BAR/width][(j-bottom)*CHUNK_BAR/height]=true;
+        }
+    }
+    return array;
+}
+
+void write_bool(bool** arr,uint32_t width,uint32_t height)
+{
+    stringstream sskode;
+    for(int i=0;i<width;i++)
+        for(int j=0;j<height;j++)
+        sskode<<arr[i][j]<<" ";
+    LOGD("Check copy:%s",sskode.str().c_str());
+}
+
+//All digit to NxN, output:vector<BorderInfo>
+vector<BorderInfo> toNxN(NativeBitmap* src){
+    bool** bool_image=convertToBoolmage(src);
+    bool** bool_image_copy=new bool*[src->bitmapInfo.width];
+    vector<BorderInfo> after_transform;
+    vector<BorderInfo>::iterator it;
+    vector<BorderInfo> borders=get_border_infos(bool_image,src->bitmapInfo.width,src->bitmapInfo.height);
+    uint32_t width=src->bitmapInfo.width,height=src->bitmapInfo.height;
+    for(uint32_t i=0;i<width;i++){
+        bool_image_copy[i]=new bool[height];
+    }
+    for(uint32_t i=0;i<width;i++)
+        for(uint32_t j=0;j<height;j++)
+            bool_image_copy[i][j]=bool_image[i][j];
+
+    write_bool(bool_image,src->bitmapInfo.width,src->bitmapInfo.height);
+    write_bool(bool_image_copy,src->bitmapInfo.width,src->bitmapInfo.height);
+
+    vector<BorderInfo> temp;
+    for(it=borders.begin();it!=borders.end();it++){
+            temp=get_border_infos(singleToNxN(*it,bool_image_copy),CHUNK_BAR,CHUNK_BAR);
+            after_transform.insert(after_transform.end(),temp.begin(),temp.end());
+    }
+    return temp;
+}
+
+
+
+void write_to_file(uint32_t* arr,uint32_t size)
+{
+    stringstream sskode;
+    for(int i=0;i<size;i++)
+            sskode<<arr[i]<<" ";
+    LOGD("Smoothing:%s",sskode.str().c_str());
+}
+/**************SMOOTHING + NXN *******************
+************************************************/
+
+
+NativeBitmap* smoothing(NativeBitmap* res){
+    uint32_t width=res->bitmapInfo.width;
+    uint32_t height=res->bitmapInfo.height;
+    uint32_t size=width*height;
+    vector<int> value;
+    vector<int>::iterator it;
+    uint32_t *value_array=res->pixels;
+    LOGD("Currr: %d %d %d",width,height,size);
+    for(uint32_t i=0;i<size;i++){
+        int up,bottom,left,right,up_right,up_left,bottom_right,bottom_left;
+        if((i+width)<=(height*width-1)){up=(int)(i+width);value.push_back(up);}else {up=-1;} //up cell
+        if(i>width){bottom=(int)(i-width);value.push_back(bottom);}else{bottom=-1;}
+        if(i%width!=width-1){right=(int)(i+1);value.push_back(right);}else{right=-1;}
+        if(i%width!=0){left=(int)(i-1);value.push_back(left);}else{left=-1;}
+        if(up!=-1 && right!=-1) {up_right=up+1;value.push_back(up_right);}
+        if(up!=-1 && left!=-1) {up_left=up-1;value.push_back(up_left);}
+        if(bottom!=-1 && right!=-1) {bottom_right=bottom+1;value.push_back(bottom_right);}
+        if(bottom!=-1 && left!=-1) {bottom_left=bottom-1;value.push_back(bottom_left);}
+        uint32_t mean=0;
+        for(it=value.begin();it!=value.end();it++){
+            mean+=value_array[(*it)];
+        }
+        mean=mean/8;
+        value_array[i]=mean;
+    }
+    write_to_file(value_array,size);
+    return res;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////
 // VOTING?
 //////////////////////////////////////////////////////////////////////////////////
@@ -912,13 +1065,26 @@ JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (
 
 JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path){
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    nativeBitmap=smoothing(nativeBitmap);
     bool **image = convertToBoolmage(nativeBitmap);
     const char* path_knowledge = env->GetStringUTFChars( path , NULL ) ;
     vector<Knowledge> knowledge = createKnowledge(path_knowledge);
     //vector<Train> train = createKnowledge(path_knowledge);
 
     vector<DetectedChar> interpretation;
-    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
+    //vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
+    vector<BorderInfo> border_infos=toNxN(nativeBitmap);
+    LOGD("Size borderinfo:%d",border_infos.size());
+    vector<BorderInfo>::iterator it;
+    for(it=border_infos.begin();it!=border_infos.end();it++){
+        vector<int> temp=it->chain_codes;
+        vector<int>::iterator it;
+        stringstream stream;
+        for(it=temp.begin();it!=temp.end();it++){
+            stream<<(*it);
+        }
+        LOGD("kd belok:%s",stream.str().c_str());
+    }
     delete nativeBitmap;
 
     stringstream list_kode_belok;

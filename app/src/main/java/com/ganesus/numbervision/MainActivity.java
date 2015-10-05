@@ -68,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
         Bitmap canvas = Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), conf);
 
         Bitmap hh = preProses(bmp, canvas);
-
+        merek=null;
         if (merek != null){
             Bitmap p_merek = preProses(bmp, canvas);
 
@@ -118,6 +118,7 @@ public class MainActivity extends AppCompatActivity {
         }
         KNOWLEDGE_PATH = knowledgeFile.getAbsolutePath();
     }
+
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
