@@ -872,6 +872,58 @@ bool** convertToBoolmage(NativeBitmap* nativeBitmap){
     vector<int> chain_codes;
 }BorderInfo;*/
 
+
+void write_bool(bool** arr,Point p1,Point p2)
+{
+    for(int i=p1.y;i<=p2.y;i++) {
+        stringstream sskode;
+        for (int j = p1.x; j <= p2.x; j++)
+            sskode << arr[i][j] << " ";
+        LOGD("%s", sskode.str().c_str());
+    }
+}
+
+void write_to_file(vector<int>* arr)
+{
+    stringstream sskode;
+    vector<int>::iterator it;
+    //for(int i=0;i<size;i++)
+    for(it=arr->begin();it!=arr->end();it++)
+        sskode<<(*it)<<" ";
+    LOGD("Smoothing:%s",sskode.str().c_str());
+}
+/**************SMOOTHING + NXN *******************
+************************************************/
+
+
+NativeBitmap* smoothing(NativeBitmap* res){
+    uint32_t width=res->bitmapInfo.width;
+    uint32_t height=res->bitmapInfo.height;
+    uint32_t size=width*height;
+    vector<int> value;
+    vector<int>::iterator it;
+    uint32_t *value_array=res->pixels;
+    for(uint32_t i=0;i<size;i++){
+        int up,bottom,left,right,up_right,up_left,bottom_right,bottom_left;
+        if((i+width)<=(height*width-1)){up=(int)(i+width);value.push_back(up);}else {up=-1;} //up cell
+        if(i>width){bottom=(int)(i-width);value.push_back(bottom);}else{bottom=-1;}
+        if(i%width!=width-1){right=(int)(i+1);value.push_back(right);}else{right=-1;}
+        if(i%width!=0){left=(int)(i-1);value.push_back(left);}else{left=-1;}
+        if(up!=-1 && right!=-1) {up_right=up+1;value.push_back(up_right);}
+        if(up!=-1 && left!=-1) {up_left=up-1;value.push_back(up_left);}
+        if(bottom!=-1 && right!=-1) {bottom_right=bottom+1;value.push_back(bottom_right);}
+        if(bottom!=-1 && left!=-1) {bottom_left=bottom-1;value.push_back(bottom_left);}
+        uint32_t mean=0;
+        for(it=value.begin();it!=value.end();it++){
+            mean+=value_array[(*it)];
+        }
+        mean=mean/8;
+        value_array[i]=mean;
+    }
+    return res;
+}
+
+
 Point chcodeToPoint(Point start,int chcode){
     switch(chcode) {
         case 0:
@@ -903,11 +955,12 @@ Point chcodeToPoint(Point start,int chcode){
             break;
     }
 }
+
 //Single digit to NxN
 bool** singleToNxN(BorderInfo input,bool** image_copy){
     vector<int> *temp=&(input.chain_codes);
     vector<int>::iterator it;
-    int up=input.start_point.y,bottom=input.start_point.y,right=input.start_point.x,left=input.start_point.x;
+    int up=input.start_point.y,bottom=up,right=input.start_point.x,left=right;
     Point nextP=input.start_point;
     //Find rectangle that includes the number
     for(it=temp->begin();it!=temp->end();it++){
@@ -919,106 +972,74 @@ bool** singleToNxN(BorderInfo input,bool** image_copy){
     }
     int width=right-left+1;
     int height=up-bottom+1;
-    bool** array=new bool*[CHUNK_BAR];
-    for(int i=0;i<CHUNK_BAR;i++)array[i]=new bool[CHUNK_BAR];
+    bool** array=new bool*[CHUNK_BAR+2];
+    for(int i=0;i<CHUNK_BAR+2;i++)array[i]=new bool[CHUNK_BAR+2];
     //Init elemen array to 0
-    for(int i=0;i<CHUNK_BAR;i++)
-        for(int j=0;j<CHUNK_BAR;j++)
+    for(int i=0;i<CHUNK_BAR+2;i++)
+        for(int j=0;j<CHUNK_BAR+2;j++)
             array[i][j]=false;
     //mxn to 5x5
-    for(int i=left;i<=right;i+=width/CHUNK_BAR){
-        for(int j=bottom;j<=up;j+=height/CHUNK_BAR){
+    int row=width/CHUNK_BAR,col=height/CHUNK_BAR;
+    int sum=row*col;
+    for(int j=bottom;j<=up;j+=col){
+        for(int i=left;i<=right;i+=row){
             //Check majority of black
             int counter=0;
             int black=0;
-            for(int n=i;n<=i+(width/CHUNK_BAR)-1 && n<=right;n++)
-                for(int m=j;m<=j+(height/CHUNK_BAR)-1 && m<=up;m++) {
-                    if (image_copy[n][m] == true) black++;
+            LOGD("Ordinat: %d %d || Absis:%d %d",j,j+col-1,i,i+row-1);
+            for (int m = j; m <= j + (col) - 1 && m <= up; m++) {
+                stringstream ss;
+                for(int n=i;n<=i+(row)-1 && n<=right;n++){
+                    if (image_copy[m][n] == true) {ss<<1<<" ";black++;}
+                    else ss<<0<<" ";
                     counter++;
                 }
+                //LOGD("%s",ss.str().c_str());
+            }
             //calculate percentage of black
-            float percent=(float)black/counter;
-            if(percent>TRESHOLD_BLACK) array[(i-left)*CHUNK_BAR/width][(j-bottom)*CHUNK_BAR/height]=true;
+            if(counter!=0){
+                float percent=(float)black/sum;
+                LOGD("x:%d||y:%d===>percent=%d/%d=%f",(j-bottom)/col,(i-left)/row,black,counter,percent);
+                if(percent>TRESHOLD_BLACK) array[1+(i-left)/row][1+(j-bottom)/col]=true;
+            }
         }
     }
+    for(int i=1;i<CHUNK_BAR+2;i++) array[i][CHUNK_BAR+1]=false;
+    for(int j=1;j<CHUNK_BAR+2;j++) array[CHUNK_BAR+1][j]=false;
     return array;
-}
-
-void write_bool(bool** arr,uint32_t width,uint32_t height)
-{
-    stringstream sskode;
-    for(int i=0;i<width;i++)
-        for(int j=0;j<height;j++)
-        sskode<<arr[i][j]<<" ";
-    LOGD("Check copy:%s",sskode.str().c_str());
 }
 
 //All digit to NxN, output:vector<BorderInfo>
 vector<BorderInfo> toNxN(NativeBitmap* src){
+    LOGD("Ukuran image:%d %d",src->bitmapInfo.width,src->bitmapInfo.height);
     bool** bool_image=convertToBoolmage(src);
-    bool** bool_image_copy=new bool*[src->bitmapInfo.width];
+
+    bool** bool_image_copy=new bool*[src->bitmapInfo.height];
     vector<BorderInfo> after_transform;
     vector<BorderInfo>::iterator it;
-    vector<BorderInfo> borders=get_border_infos(bool_image,src->bitmapInfo.width,src->bitmapInfo.height);
-    uint32_t width=src->bitmapInfo.width,height=src->bitmapInfo.height;
-    for(uint32_t i=0;i<width;i++){
-        bool_image_copy[i]=new bool[height];
+    int width=src->bitmapInfo.width,height=src->bitmapInfo.height;
+
+    for(uint32_t i=0;i<height;i++){
+        bool_image_copy[i]=new bool[width];
     }
-    for(uint32_t i=0;i<width;i++)
-        for(uint32_t j=0;j<height;j++)
+    for(uint32_t i=0;i<height;i++)
+        for(uint32_t j=0;j<width;j++)
             bool_image_copy[i][j]=bool_image[i][j];
 
-    write_bool(bool_image,src->bitmapInfo.width,src->bitmapInfo.height);
-    write_bool(bool_image_copy,src->bitmapInfo.width,src->bitmapInfo.height);
+    vector<BorderInfo> borders=get_border_infos(bool_image,width,height);
 
     vector<BorderInfo> temp;
-    for(it=borders.begin();it!=borders.end();it++){
-            temp=get_border_infos(singleToNxN(*it,bool_image_copy),CHUNK_BAR,CHUNK_BAR);
-            after_transform.insert(after_transform.end(),temp.begin(),temp.end());
+
+    for(it=borders.begin();it!=borders.end();it++)
+    {
+        bool** array=singleToNxN(*it,bool_image_copy);
+        LOGD("5x5 mapping");
+        write_bool(array,Point(0,0),Point(6,6));
+        LOGD("FINISH singleToNxN");
+        temp=get_border_infos(array,CHUNK_BAR+2,CHUNK_BAR+2);
+        after_transform.insert(after_transform.end(),temp.begin(),temp.end());
     }
     return temp;
-}
-
-
-
-void write_to_file(uint32_t* arr,uint32_t size)
-{
-    stringstream sskode;
-    for(int i=0;i<size;i++)
-            sskode<<arr[i]<<" ";
-    LOGD("Smoothing:%s",sskode.str().c_str());
-}
-/**************SMOOTHING + NXN *******************
-************************************************/
-
-
-NativeBitmap* smoothing(NativeBitmap* res){
-    uint32_t width=res->bitmapInfo.width;
-    uint32_t height=res->bitmapInfo.height;
-    uint32_t size=width*height;
-    vector<int> value;
-    vector<int>::iterator it;
-    uint32_t *value_array=res->pixels;
-    LOGD("Currr: %d %d %d",width,height,size);
-    for(uint32_t i=0;i<size;i++){
-        int up,bottom,left,right,up_right,up_left,bottom_right,bottom_left;
-        if((i+width)<=(height*width-1)){up=(int)(i+width);value.push_back(up);}else {up=-1;} //up cell
-        if(i>width){bottom=(int)(i-width);value.push_back(bottom);}else{bottom=-1;}
-        if(i%width!=width-1){right=(int)(i+1);value.push_back(right);}else{right=-1;}
-        if(i%width!=0){left=(int)(i-1);value.push_back(left);}else{left=-1;}
-        if(up!=-1 && right!=-1) {up_right=up+1;value.push_back(up_right);}
-        if(up!=-1 && left!=-1) {up_left=up-1;value.push_back(up_left);}
-        if(bottom!=-1 && right!=-1) {bottom_right=bottom+1;value.push_back(bottom_right);}
-        if(bottom!=-1 && left!=-1) {bottom_left=bottom-1;value.push_back(bottom_left);}
-        uint32_t mean=0;
-        for(it=value.begin();it!=value.end();it++){
-            mean+=value_array[(*it)];
-        }
-        mean=mean/8;
-        value_array[i]=mean;
-    }
-    write_to_file(value_array,size);
-    return res;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -1066,14 +1087,15 @@ JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (
 JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path){
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
     nativeBitmap=smoothing(nativeBitmap);
-    bool **image = convertToBoolmage(nativeBitmap);
+    //vector<BorderInfo> MN=toNxN(nativeBitmap);
+    bool **image = convertToBoolmage(nativeBitmap); //nativeBitmap to 0,0
     const char* path_knowledge = env->GetStringUTFChars( path , NULL ) ;
     vector<Knowledge> knowledge = createKnowledge(path_knowledge);
     //vector<Train> train = createKnowledge(path_knowledge);
 
     vector<DetectedChar> interpretation;
-    //vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
-    vector<BorderInfo> border_infos=toNxN(nativeBitmap);
+    vector<BorderInfo> border_infos = toNxN(nativeBitmap);//get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
+/*
     LOGD("Size borderinfo:%d",border_infos.size());
     vector<BorderInfo>::iterator it;
     for(it=border_infos.begin();it!=border_infos.end();it++){
@@ -1084,7 +1106,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
             stream<<(*it);
         }
         LOGD("kd belok:%s",stream.str().c_str());
-    }
+    }*/
     delete nativeBitmap;
 
     stringstream list_kode_belok;
