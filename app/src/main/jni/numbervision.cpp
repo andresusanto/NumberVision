@@ -25,7 +25,7 @@
 #define NOT_SPECIFIED_COLOR -1
 #define TRESHOLD_ERROR 70
 #define CHUNK_BAR 5 //mxn ke 5x5
-#define TRESHOLD_BLACK 0.5 //minimum value to be perceived as black
+#define TRESHOLD_BLACK 0.3 //minimum value to be perceived as black
 
 #define E '0'
 #define S '2'
@@ -95,6 +95,8 @@ typedef struct border_info{
     Point start_point;
     vector<int> chain_codes;
 }BorderInfo;
+
+vector<int> number_chain_codes;
 
 class NativeBitmap{
 public:
@@ -831,14 +833,13 @@ bool** convertToBoolmage(NativeBitmap* nativeBitmap){
 
     //stringstream ss;
 
-
     for (int i=0;i<gBitmap->bitmapInfo.height;i++) {
         image[i] = new bool[gBitmap->bitmapInfo.width];
         for (int j=0;j<gBitmap->bitmapInfo.width;j++) {
             ARGB warna;
             convertIntToArgb(gBitmap->pixels[i * gBitmap->bitmapInfo.width + j], &warna);
-
-            image[i][j] = (warna.red > otsu);
+            float greyscale = (warna.red + warna.green + warna.blue)/3;
+            image[i][j] = (greyscale < 128);
 
 
             //if (warna.red > otsu)
@@ -904,6 +905,7 @@ NativeBitmap* smoothing(NativeBitmap* res){
     vector<int>::iterator it;
     uint32_t *value_array=res->pixels;
     for(uint32_t i=0;i<size;i++){
+        value.clear();
         int up,bottom,left,right,up_right,up_left,bottom_right,bottom_left;
         if((i+width)<=(height*width-1)){up=(int)(i+width);value.push_back(up);}else {up=-1;} //up cell
         if(i>width){bottom=(int)(i-width);value.push_back(bottom);}else{bottom=-1;}
@@ -958,6 +960,8 @@ Point chcodeToPoint(Point start,int chcode){
 
 //Single digit to NxN
 bool** singleToNxN(BorderInfo input,bool** image_copy){
+
+    LOGD("singleToNxN");
     vector<int> *temp=&(input.chain_codes);
     vector<int>::iterator it;
     int up=input.start_point.y,bottom=up,right=input.start_point.x,left=right;
@@ -966,12 +970,16 @@ bool** singleToNxN(BorderInfo input,bool** image_copy){
     for(it=temp->begin();it!=temp->end();it++){
         nextP=chcodeToPoint(nextP,(*it));
         if(nextP.x>right) right=nextP.x;
-        else if(nextP.x<left) left=nextP.x;
+        if(nextP.x<left) left=nextP.x;
         if(nextP.y>up) up=nextP.y;
-        else if(nextP.y<bottom) bottom=nextP.y;
+        if(nextP.y<bottom) bottom=nextP.y;
     }
     int width=right-left+1;
-    int height=up-bottom+1;
+    int height=up - bottom +1;
+
+    LOGD("rlub %d %d %d %d",right,left,up,bottom);
+    //write_bool(image_copy,Point(left,bottom),Point(right,up));
+
     bool** array=new bool*[CHUNK_BAR+2];
     for(int i=0;i<CHUNK_BAR+2;i++)array[i]=new bool[CHUNK_BAR+2];
     //Init elemen array to 0
@@ -979,17 +987,17 @@ bool** singleToNxN(BorderInfo input,bool** image_copy){
         for(int j=0;j<CHUNK_BAR+2;j++)
             array[i][j]=false;
     //mxn to 5x5
-    int row=width/CHUNK_BAR,col=height/CHUNK_BAR;
-    int sum=row*col;
-    for(int j=bottom;j<=up;j+=col){
-        for(int i=left;i<=right;i+=row){
+    int col=width/CHUNK_BAR,row=height/CHUNK_BAR;
+    /*int sum=row*col;
+    for(int j=bottom;j<=up;j+=row){
+        for(int i=left;i<=right;i+=col){
             //Check majority of black
             int counter=0;
             int black=0;
-            LOGD("Ordinat: %d %d || Absis:%d %d",j,j+col-1,i,i+row-1);
-            for (int m = j; m <= j + (col) - 1 && m <= up; m++) {
+            //LOGD("Ordinat: %d %d || Absis:%d %d",j,j+col-1,i,i+row-1);
+            for (int m = j; m <= j + (row) - 1 && m <= up; m++) {
                 stringstream ss;
-                for(int n=i;n<=i+(row)-1 && n<=right;n++){
+                for(int n=i;n<=i+(col)-1 && n<=right;n++){
                     if (image_copy[m][n] == true) {ss<<1<<" ";black++;}
                     else ss<<0<<" ";
                     counter++;
@@ -999,15 +1007,42 @@ bool** singleToNxN(BorderInfo input,bool** image_copy){
             //calculate percentage of black
             if(counter!=0){
                 float percent=(float)black/sum;
-                LOGD("x:%d||y:%d===>percent=%d/%d=%f",(j-bottom)/col,(i-left)/row,black,counter,percent);
-                if(percent>TRESHOLD_BLACK) array[1+(i-left)/row][1+(j-bottom)/col]=true;
+                //LOGD("x:%d||y:%d===>percent=%d/%d=%f",(j-bottom)/col,(i-left)/row,black,counter,percent);
+                if(percent>TRESHOLD_BLACK) array[1+(j-bottom)/row][1+(i-left)/col]=true;
             }
         }
+    }*/
+
+    for (int i=0;i<CHUNK_BAR;i++) {
+        for (int j=0;j<CHUNK_BAR;j++) {
+            int black = 0;
+            int white = 0;
+
+            for (int k=0;k<row;k++) {
+                for (int l = 0;l<col;l++) {
+                    if (i*row+k > up || j*col+l > right) {
+                        //TODO
+                    }
+                    else if (image_copy[i*row+k+bottom][j*col+l+left]) black++;
+                    else white++;
+                }
+            }
+
+            array[i+1][j+1] = (((float)black/(black+white)) > TRESHOLD_BLACK);
+
+
+        }
     }
+
+    LOGD("lalalalala");
     for(int i=1;i<CHUNK_BAR+2;i++) array[i][CHUNK_BAR+1]=false;
     for(int j=1;j<CHUNK_BAR+2;j++) array[CHUNK_BAR+1][j]=false;
     return array;
 }
+
+//TODO HACK
+string result;
+string kode_beloks;
 
 //All digit to NxN, output:vector<BorderInfo>
 vector<BorderInfo> toNxN(NativeBitmap* src){
@@ -1030,15 +1065,57 @@ vector<BorderInfo> toNxN(NativeBitmap* src){
 
     vector<BorderInfo> temp;
 
-    for(it=borders.begin();it!=borders.end();it++)
+   for(it=borders.begin();it!=borders.end();it++)
     {
         bool** array=singleToNxN(*it,bool_image_copy);
         LOGD("5x5 mapping");
-        write_bool(array,Point(0,0),Point(6,6));
+        write_bool(array,Point(0,0),Point(CHUNK_BAR+1,CHUNK_BAR+1));
         LOGD("FINISH singleToNxN");
+        Point p1 = Point(0,0);
+        Point p2 = Point(CHUNK_BAR+1,CHUNK_BAR+1);
+        LOGD("%d %d %d %d\n",p1.x,p1.y,p2.x,p2.y);
+        result.clear();
+        for(int i=p1.y;i<=p2.y;i++) {
+            string sskode = "";
+            for (int j = p1.x; j <= p2.x; j++){
+                char c = array[i][j];
+                c = c + '0';
+                sskode += c;
+            }
+            result = result + sskode + "\n";
+            LOGD("%s",result.c_str());
+        }
         temp=get_border_infos(array,CHUNK_BAR+2,CHUNK_BAR+2);
+        vector<int> codes = temp[0].chain_codes;
+        int FINAL_LENGTH = 200;
+        int numDuplicate = FINAL_LENGTH/(int) codes.size();
+
+        for (int i=0;i<codes.size();i++) {
+            for (int j=0;j<numDuplicate;j++) {
+                number_chain_codes.push_back(codes[i]);
+            }
+        }
+        string _chain_code = "";
+        for(int i = 0; i < (int) number_chain_codes.size(); i++){
+            _chain_code += ((char) (number_chain_codes[i] + '0'));
+        }
+        LOGD("cc = %s\n",_chain_code.c_str());
+        kode_beloks = generate_turn(_chain_code);
+        LOGD("%s",kode_beloks.c_str());
+
+
+
+
         after_transform.insert(after_transform.end(),temp.begin(),temp.end());
     }
+    LOGD("hasil");
+    LOGD("%s",result.c_str());
+
+
+
+
+
+
     return temp;
 }
 
@@ -1085,10 +1162,10 @@ JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (
 
 
 JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path){
+    kode_beloks.clear();
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
-    nativeBitmap=smoothing(nativeBitmap);
+    //nativeBitmap=smoothing(nativeBitmap);
     //vector<BorderInfo> MN=toNxN(nativeBitmap);
-    bool **image = convertToBoolmage(nativeBitmap); //nativeBitmap to 0,0
     const char* path_knowledge = env->GetStringUTFChars( path , NULL ) ;
     vector<Knowledge> knowledge = createKnowledge(path_knowledge);
     //vector<Train> train = createKnowledge(path_knowledge);
@@ -1173,9 +1250,9 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     fclose(file);
 
     // [1] adalah ekspresi input, [2] adalah hasil perhitungan*/
-    std::string tes[] = { ss.str().c_str(), list_kode_belok.str().c_str() };
+    std::string tes[] = { ss.str().c_str(), kode_beloks.c_str(),result.c_str() };
     //std::string tes[] = { ss.str().c_str(), "44" };
-    jobjectArray hasil2 = createJavaArray(env, 2, tes);
+    jobjectArray hasil2 = createJavaArray(env, 3, tes);
 
     return hasil2;
 }

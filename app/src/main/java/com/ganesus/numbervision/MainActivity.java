@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -60,8 +61,6 @@ public class MainActivity extends AppCompatActivity {
             bmp = Bitmap.createBitmap(bmp, 341, 438, 332, 55);
         }
 
-
-
         String hasil[] = detectAll(bmp, KNOWLEDGE_PATH);
 
         Bitmap.Config conf = Bitmap.Config.ARGB_8888;
@@ -97,6 +96,8 @@ public class MainActivity extends AppCompatActivity {
         TextView tv2 = (TextView) findViewById(R.id.txtKodeBelok);
         tv2.setText(hasil[1]);
 
+        TextView tv3 = (TextView) findViewById(R.id.txtKodeBelok2);
+        tv3.setText(hasil[2]);
 
 
         ImageView iv = (ImageView) findViewById(R.id.imageView);
@@ -135,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
             String picturePath = cursor.getString(columnIndex);
             cursor.close();
 
-
+            Log.d("DEBUG", "onActivityResult");
             prosesBitmap(picturePath);
 
         }

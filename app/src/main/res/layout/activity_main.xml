@@ -100,15 +100,26 @@
                 android:layout_alignLeft="@+id/txtPerhitungan"
                 android:layout_alignStart="@+id/txtPerhitungan"/>
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:id="@+id/textView5"
+                android:text="kode belok 2"
+                android:visibility="visible"
+                android:layout_below="@+id/textView4"
+                android:layout_alignParentLeft="true"
+                android:layout_alignParentStart="true"
+                android:layout_marginTop="10dp" />
+
             <ImageView
                 android:layout_width="fill_parent"
                 android:layout_height="150dp"
                 android:id="@+id/imageView"
-                android:layout_below="@+id/txtKodeBelok"
+                android:adjustViewBounds="true"
+                android:layout_below="@+id/txtKodeBelok2"
                 android:layout_alignParentLeft="true"
-                android:layout_alignParentStart="true"
-                android:layout_marginTop="20dp"
-                android:adjustViewBounds="true" />
+                android:layout_alignParentStart="true" />
 
             <ImageView
                 android:layout_width="fill_parent"
@@ -119,6 +130,14 @@
                 android:layout_alignParentStart="true"
                 android:adjustViewBounds="true" />
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="New Text"
+                android:id="@+id/txtKodeBelok2"
+                android:layout_alignTop="@+id/textView5"
+                android:layout_toRightOf="@+id/txtKodeBelok"
+                android:layout_toEndOf="@+id/txtKodeBelok" />
 
 
         </RelativeLayout>
