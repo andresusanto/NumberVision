@@ -55,7 +55,7 @@ public class VisionActivity extends AppCompatActivity {
 
 
             boolean[][] boolImage = nativeBitmap.convertToBoolmage();
-            /*List<ChainGenerator.BorderInfo> borderInfos = ChainGenerator.get_border_infos(boolImage, w, h);
+            List<ChainGenerator.BorderInfo> borderInfos = ChainGenerator.get_border_infos(boolImage, w, h);
 
             for (int i = 0 ; i < borderInfos.size(); i++){
                 StringBuffer sb = new StringBuffer();
@@ -64,7 +64,7 @@ public class VisionActivity extends AppCompatActivity {
                 }
 
                 Log.i("NUMVISION", sb.toString());
-            }*/
+            }
         }
 
     }
