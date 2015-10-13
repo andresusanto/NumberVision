@@ -22,14 +22,14 @@ public class ChainGenerator {
         }
     }
 
-    private Point sumPoint(Point a, Point b){
+    private static Point sumPoint(Point a, Point b){
         Point ret = new Point(a);
         a.set(a.x + b.x, a.y + b.y);
 
         return ret;
     }
 
-    private Point get_next_traverse_point(Point current_black,Point current_traverse_point) {
+    private static Point get_next_traverse_point(Point current_black,Point current_traverse_point) {
         Point next = current_traverse_point;
         if (current_traverse_point.x == current_black.x-1 &&
                 current_traverse_point.y == current_black.y+1) {
@@ -59,7 +59,7 @@ public class ChainGenerator {
         return next;
     }
 
-    private int get_chain_code(Point current_black,Point prev_black) {
+    private static int get_chain_code(Point current_black,Point prev_black) {
         int chain_code = 0;
         if (prev_black.x == current_black.x-1 &&
                 prev_black.y == current_black.y+1) {
@@ -90,7 +90,7 @@ public class ChainGenerator {
     }
 
 
-    private void erase_image(Point start_point, boolean image[][],int length,int height) {
+    private static void erase_image(Point start_point, boolean image[][],int length,int height) {
 
         Point direction[] = {new Point(1,0), new Point(1,1), new Point(0,1), new Point(-1,1), new Point(-1,0), new Point(-1,-1), new Point(0,-1), new Point(1,-1)};
 
@@ -113,7 +113,7 @@ public class ChainGenerator {
         }
     }
 
-    private boolean is_point(Point point, boolean image[][]) {
+    private static boolean is_point(Point point, boolean image[][]) {
 
         int x = point.x;
         int y = point.y;
@@ -121,7 +121,7 @@ public class ChainGenerator {
         return image[y][x] && !image[y-1][x] && !image[y][x-1] && !image[y+1][x] && !image[y][x+1];
     }
 
-    private Point get_start_point(boolean image[][], int length,int height) {
+    private static Point get_start_point(boolean image[][], int length,int height) {
         for (int i=0;i<height;i++) {
             for (int j=0;j<length;j++) {
                 if (image[i][j]) return new Point(j,i);
@@ -130,7 +130,7 @@ public class ChainGenerator {
         return new Point(-1,-1);
     }
 
-    private List<Integer> get_chain_codes(Point start_point, boolean image[][],int length,int height) {
+    private static List<Integer> get_chain_codes(Point start_point, boolean image[][],int length,int height) {
 
         List<Integer> chain_codes = new ArrayList<>();
 
@@ -172,7 +172,7 @@ public class ChainGenerator {
         return chain_codes;
     }
 
-    List<BorderInfo> get_border_infos(boolean image[][],int length,int height) {
+    public static List<BorderInfo> get_border_infos(boolean image[][],int length,int height) {
         List<BorderInfo> border_infos = new ArrayList<>();
 
         while(true) {

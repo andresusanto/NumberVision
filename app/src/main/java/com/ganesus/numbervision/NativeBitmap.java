@@ -131,6 +131,7 @@ public class NativeBitmap {
     NativeBitmap(Bitmap bitmap){
         width = bitmap.getWidth();
         height = bitmap.getHeight();
+        pixels = new int[bitmap.getWidth() * bitmap.getHeight()];
 
         bitmap.getPixels(pixels, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
     }

@@ -1,13 +1,23 @@
 package com.ganesus.numbervision;
 
+import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
+import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+
+import java.util.List;
 
 public class VisionActivity extends AppCompatActivity {
 
-
+    private static int RESULT_LOAD_IMAGE = 1212;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -15,25 +25,47 @@ public class VisionActivity extends AppCompatActivity {
         setContentView(R.layout.activity_vision);
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_vision, menu);
-        return true;
+    public void onClickTest(View v){
+        Intent i = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(i, RESULT_LOAD_IMAGE);
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
 
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
+        if (requestCode == RESULT_LOAD_IMAGE && resultCode == RESULT_OK && null != data) {
+            Uri selectedImage = data.getData();
+            String[] filePathColumn = {MediaStore.Images.Media.DATA};
+
+            Cursor cursor = getContentResolver().query(selectedImage, filePathColumn, null, null, null);
+            cursor.moveToFirst();
+
+            int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+            String picturePath = cursor.getString(columnIndex);
+            cursor.close();
+
+
+            Bitmap bmp = BitmapFactory.decodeFile(picturePath);
+            NativeBitmap nativeBitmap = new NativeBitmap(bmp);
+            nativeBitmap.grayscaleBitmap();
+
+            int w = bmp.getWidth(); int h = bmp.getHeight();
+            bmp.recycle();
+
+
+            boolean[][] boolImage = nativeBitmap.convertToBoolmage();
+            /*List<ChainGenerator.BorderInfo> borderInfos = ChainGenerator.get_border_infos(boolImage, w, h);
+
+            for (int i = 0 ; i < borderInfos.size(); i++){
+                StringBuffer sb = new StringBuffer();
+                for (int j = 0 ; j < borderInfos.get(i).chain_codes.size(); j++){
+                    sb.append(borderInfos.get(i).chain_codes.get(j));
+                }
+
+                Log.i("NUMVISION", sb.toString());
+            }*/
         }
 
-        return super.onOptionsItemSelected(item);
     }
 }
