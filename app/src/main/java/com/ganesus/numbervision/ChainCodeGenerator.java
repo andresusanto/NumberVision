@@ -1,5 +1,7 @@
 package com.ganesus.numbervision;
 
+import android.util.Log;
+
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -15,7 +17,7 @@ public class ChainCodeGenerator {
     }
 
     private Point getNextTraversePoint(Point currentBlack,Point currentTraversePoint) {
-        Point next = currentTraversePoint;
+        Point next = new Point (currentTraversePoint.x,currentTraversePoint.y);
         if (currentTraversePoint.x == currentBlack.x-1 &&
                 currentTraversePoint.y == currentBlack.y+1) {
             next.y -= 1;
@@ -88,7 +90,8 @@ public class ChainCodeGenerator {
             Point front = bfs_queue.poll();
 
             for (int i=0;i<8;i++) {
-                Point current_point = front.add(direction[i]);
+                Point tmp = front.add(direction[i]);
+                Point current_point = new Point(tmp.x,tmp.y);
                 if (current_point.x >=0 && current_point.x <= length && current_point.y >= 0 && current_point.y <= height &&
                         image[current_point.y][current_point.x]) {
                     image[current_point.y][current_point.x] = false;
@@ -121,36 +124,36 @@ public class ChainCodeGenerator {
 
         if (isPoint(startPoint, image)) return chain_codes.toString();
 
-        Point currentBlack = startPoint;
-        Point current_white = currentBlack;
+        Point currentBlack = new Point(startPoint.x,startPoint.y);
+        Point current_white = new Point(currentBlack.x,currentBlack.y);
         current_white.x -= 1;
 
-        Point black0 = currentBlack;
+        Point black0 = new Point(currentBlack.x, currentBlack.y);
         Point black1 = null;
 
         boolean has_first_found = false;
 
-        Point traverse_point = current_white;
-        Point traverse_point_prev = current_white;
-        while (true) {
+        Point traverse_point = new Point(current_white.x,current_white.y);
+        Point traverse_point_prev = new Point(current_white.x,current_white.y);
 
-            traverse_point_prev = traverse_point;
-            traverse_point = getNextTraversePoint(currentBlack, traverse_point);
-            if (has_first_found && currentBlack == black0 && black1 == traverse_point) {
+        while (true) {
+            traverse_point_prev.setPoint(traverse_point);
+            traverse_point.setPoint(getNextTraversePoint(currentBlack, traverse_point));
+            if (has_first_found && currentBlack.equals(black0) && black1.equals(traverse_point)) {
                 break;
             }
             if (image[traverse_point.y][traverse_point.x]) {
                 String chain_code = getChainCode(traverse_point,currentBlack);
 
                 if (!has_first_found) {
-                    black1 = traverse_point;
+                    black1 = new Point(traverse_point.x,traverse_point.y);
                     has_first_found = true;
                 }
 
                 chain_codes.append(chain_code);
-                currentBlack = traverse_point;
-                current_white = traverse_point_prev;
-                traverse_point = current_white;
+                currentBlack.setPoint(traverse_point);
+                current_white.setPoint(traverse_point_prev);
+                traverse_point.setPoint(current_white);
 
             }
         }

@@ -28,7 +28,16 @@ public class Point {
         this.y = y;
     }
 
+    public void setPoint(Point point) {
+        this.x = point.x;
+        this.y = point.y;
+    }
+
     Point add(Point other) {
         return new Point(x + other.x, y + other.y);
+    }
+
+    public boolean equals(Point point) {
+        return point.x == point.x && point.y == point.y;
     }
 }
