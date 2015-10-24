@@ -53,17 +53,14 @@ public class VisionActivity extends AppCompatActivity {
             int w = bmp.getWidth(); int h = bmp.getHeight();
             bmp.recycle();
 
+            ChainCodeGenerator chainCodeGenerator = new ChainCodeGenerator();
 
             boolean[][] boolImage = nativeBitmap.convertToBoolmage();
-            List<ChainGenerator.BorderInfo> borderInfos = ChainGenerator.get_border_infos(boolImage, w, h);
+            Log.i("NUMVISION", "Konvert" + w + h);
+            List<ChainCodeGenerator.BorderInfo> borderInfos = chainCodeGenerator.getBorderInfos(boolImage, w, h);
 
             for (int i = 0 ; i < borderInfos.size(); i++){
-                StringBuffer sb = new StringBuffer();
-                for (int j = 0 ; j < borderInfos.get(i).chain_codes.size(); j++){
-                    sb.append(borderInfos.get(i).chain_codes.get(j));
-                }
-
-                Log.i("NUMVISION", sb.toString());
+                Log.i("NUMVISION", borderInfos.get(i).chainCodes);
             }
         }
 
