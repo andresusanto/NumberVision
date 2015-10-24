@@ -5,12 +5,10 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 
 import java.util.List;
@@ -45,7 +43,6 @@ public class VisionActivity extends AppCompatActivity {
             String picturePath = cursor.getString(columnIndex);
             cursor.close();
 
-
             Bitmap bmp = BitmapFactory.decodeFile(picturePath);
             NativeBitmap nativeBitmap = new NativeBitmap(bmp);
             nativeBitmap.grayscaleBitmap();
@@ -56,12 +53,21 @@ public class VisionActivity extends AppCompatActivity {
             ChainCodeGenerator chainCodeGenerator = new ChainCodeGenerator();
 
             boolean[][] boolImage = nativeBitmap.convertToBoolmage();
-            Log.i("NUMVISION", "Konvert" + w + h);
-            List<ChainCodeGenerator.BorderInfo> borderInfos = chainCodeGenerator.getBorderInfos(boolImage, w, h);
 
+
+
+            ChainCodeGenerator ccg = new ChainCodeGenerator();
+
+            Log.d("DEBUG","d1");
+            List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.getBorderInfos(boolImage,w,h);
+
+            Log.d("DEBUG","d2");
             for (int i = 0 ; i < borderInfos.size(); i++){
                 Log.i("NUMVISION", borderInfos.get(i).chainCodes);
+
             }
+
+            Log.d("DEBUG","Sudah selesai");
         }
 
     }
