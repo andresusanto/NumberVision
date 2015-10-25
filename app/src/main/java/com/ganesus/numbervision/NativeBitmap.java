@@ -96,6 +96,40 @@ public class NativeBitmap {
         return (threshold1 + threshold2) / 2.0f;
     }
 
+    public int[][] convertToBinary(){
+        int image[][] = new int[height][];
+        int nBitmapSize = width * height;
+
+        int histogram[] = createHistogram();
+
+        float otsu = generateOtsu(histogram, nBitmapSize);
+
+
+        for (int i=0;i< height;i++) {
+            image[i] = new int[width];
+
+            for (int j=0;j< width;j++) {
+                RGB warna = convertIntToArgb(pixels[i * width + j]);
+                if (warna.red > otsu){
+                    image[i][j] = 1;
+                }
+            }
+        }
+
+        // create border
+        for (int i=0;i<width;i++) {
+            image[0][i] = 0;
+            image[height-1][i] = 0;
+        }
+
+        for (int i=0;i<height;i++) {
+            image[i][0] = 0;
+            image[i][width-1] = 0;
+        }
+
+        return image;
+    }
+
     public boolean[][] convertToBoolmage(){ // syarat harus grayscale
         boolean image[][] = new boolean[height][];
         int nBitmapSize = width * height;
