@@ -11,6 +11,11 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 
+import com.ganesus.numbervision.engine.ChainCodeGenerator;
+import com.ganesus.numbervision.engine.Interpretator;
+import com.ganesus.numbervision.engine.NativeBitmap;
+import com.ganesus.numbervision.engine.ToNxN;
+
 import java.util.List;
 
 public class VisionActivity extends AppCompatActivity {

@@ -1,4 +1,4 @@
-package com.ganesus.numbervision;
+package com.ganesus.numbervision.engine;
 
 import android.content.res.Resources;
 import android.util.Log;
@@ -156,7 +156,7 @@ public class Interpretator {
         return currentChar;
     }
 
-    Interpretator(Resources r, int resourceID){
+    public Interpretator(Resources r, int resourceID){
         loadKnowledge(r, resourceID);
     }
 }

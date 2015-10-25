@@ -1,4 +1,4 @@
-package com.ganesus.numbervision;
+package com.ganesus.numbervision.engine;
 
 import java.util.LinkedList;
 import java.util.List;

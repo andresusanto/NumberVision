@@ -1,4 +1,4 @@
-package com.ganesus.numbervision;
+package com.ganesus.numbervision.engine;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -10,8 +10,8 @@ import java.util.Queue;
 public class ChainCodeGenerator {
 
     public static class BorderInfo {
-        Point startPoint;
-        String chainCodes;
+        public Point startPoint;
+        public String chainCodes;
     }
 
     private Point getNextTraversePoint(Point currentBlack,Point currentTraversePoint) {
@@ -157,7 +157,7 @@ public class ChainCodeGenerator {
         return chain_codes.toString();
     }
 
-    ArrayList<BorderInfo> getBorderInfos(boolean[][] image, int length, int height) {
+    public ArrayList<BorderInfo> getBorderInfos(boolean[][] image, int length, int height) {
         ArrayList<BorderInfo> borderInfos = new ArrayList<>();
         while(true) {
             Point startPoint = getStartPoint(image, length, height);

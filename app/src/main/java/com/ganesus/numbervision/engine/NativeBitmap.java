@@ -1,4 +1,4 @@
-package com.ganesus.numbervision;
+package com.ganesus.numbervision.engine;
 
 import android.graphics.Bitmap;
 
@@ -168,7 +168,7 @@ public class NativeBitmap {
         return image;
     }
 
-    NativeBitmap(Bitmap bitmap){
+    public NativeBitmap(Bitmap bitmap){
         width = bitmap.getWidth();
         height = bitmap.getHeight();
         pixels = new int[bitmap.getWidth() * bitmap.getHeight()];
