@@ -92,7 +92,7 @@ public class Vision5 extends AppCompatActivity {
             StringBuilder outText = new StringBuilder();
 
             for (int i = 0 ; i < borderInfos.size(); i++){
-                if (borderInfos.get(i).chainCodes.length() > 0) {
+                if (borderInfos.get(i).chainCodes.length() > 10) {
                     Log.d("DEBUG",borderInfos.get(i).chainCodes);
 
                     outText.append(interpretator.guessChain(borderInfos.get(i).chainCodes));
