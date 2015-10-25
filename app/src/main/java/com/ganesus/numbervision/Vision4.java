@@ -21,8 +21,10 @@ import com.ganesus.numbervision.engine.Interpretator;
 import com.ganesus.numbervision.engine.NativeBitmap;
 import com.ganesus.numbervision.engine.ToNxN;
 import com.ganesus.numbervision.engine.TurnCodeImpl;
+import com.ganesus.numbervision.engine.TurnInterpretator;
 import com.ganesus.numbervision.engine.ZhangSuenGenerator;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Vision4 extends AppCompatActivity {
@@ -79,11 +81,9 @@ public class Vision4 extends AppCompatActivity {
 
             Bitmap hasil = nativeBitmap.draw(boolImage);
 
-            //ZhangSuenGenerator zhangSuenGenerator = new ZhangSuenGenerator();
-            //zhangSuenGenerator.doZhangSuenThinning(boolImage,true);
-
-            //ImageView iv = (ImageView) findViewById(R.id.imageView);
-            //iv.setImageBitmap(nativeBitmap.draw(boolImage));
+            List<TurnInterpretator> tclearns = new ArrayList();
+            tclearns.add(new TurnInterpretator("RRRR",'0'));
+            tclearns.add(new TurnInterpretator("RLLRRRRLLRR",'H'));
 
             ChainCodeGenerator ccg = new ChainCodeGenerator();
             List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.sorter(ccg.getBorderInfos(boolImage,w,h));
@@ -116,6 +116,9 @@ public class Vision4 extends AppCompatActivity {
                     outText.append(line);
                     outText.append("Kode Belok: ");
                     outText.append(kodeBelok);
+                    outText.append("\nInterpret: ");
+                    outText.append(TurnInterpretator.intepret(kodeBelok, tclearns));
+
                     outText.append("\n\n");
                 }
             }
