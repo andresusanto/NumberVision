@@ -50,16 +50,36 @@ public class VisionActivity extends AppCompatActivity {
             int w = bmp.getWidth(); int h = bmp.getHeight();
             bmp.recycle();
 
-
             boolean[][] boolImage = nativeBitmap.convertToBoolmage();
 
+            //print image before thinning
+            Log.d("DEBUG","Before Thinning");
+            for (int i=0;i<h;i++) {
+                StringBuilder line = new StringBuilder("");
+                for (int j=0;j<w;j++) {
+                    if (boolImage[i][j]) line.append("1");
+                    else line.append("0");
+                }
+                Log.d("DEBUG",line.toString());
+            }
+
+            ZhangSuenGenerator zhangSuenGenerator = new ZhangSuenGenerator();
+            zhangSuenGenerator.doZhangSuenThinning(boolImage,true);
+
+            //print image after thinning
+            Log.d("DEBUG","ZhangSuenThinning");
+            for (int i=0;i<h;i++) {
+                StringBuilder line = new StringBuilder("");
+                for (int j=0;j<w;j++) {
+                    if (boolImage[i][j]) line.append("1");
+                    else line.append("0");
+                }
+                Log.d("DEBUG",line.toString());
+            }
 
             ChainCodeGenerator ccg = new ChainCodeGenerator();
-
-            Log.d("DEBUG","d1");
             List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.getBorderInfos(boolImage,w,h);
 
-            Log.d("DEBUG","d2");
             for (int i = 0 ; i < borderInfos.size(); i++){
                 StringBuffer sb = new StringBuffer();
                 for (int j = 0 ; j < borderInfos.get(i).chainCodes.length(); j++){

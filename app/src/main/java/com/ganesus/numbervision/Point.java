@@ -38,6 +38,6 @@ public class Point {
     }
 
     public boolean equals(Point point) {
-        return point.x == point.x && point.y == point.y;
+        return x == point.x && y == point.y;
     }
 }

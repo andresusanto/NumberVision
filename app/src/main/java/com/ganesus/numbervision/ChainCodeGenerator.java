@@ -1,7 +1,5 @@
 package com.ganesus.numbervision;
 
-import android.util.Log;
-
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -138,10 +136,12 @@ public class ChainCodeGenerator {
 
         while (true) {
             traverse_point_prev.setPoint(traverse_point);
+
             traverse_point.setPoint(getNextTraversePoint(currentBlack, traverse_point));
             if (has_first_found && currentBlack.equals(black0) && black1.equals(traverse_point)) {
                 break;
             }
+
             if (image[traverse_point.y][traverse_point.x]) {
                 String chain_code = getChainCode(traverse_point,currentBlack);
 

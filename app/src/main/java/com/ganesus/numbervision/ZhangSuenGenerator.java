@@ -5,8 +5,11 @@ import java.util.List;
 
 public class ZhangSuenGenerator {
 
-    public int[][] doZhangSuenThinning(final int[][] givenImage, boolean changeGivenImage) {
-        int[][] binaryImage;
+    private static Point[] direction = {new Point(1,0), new Point(1,1), new Point(0,1), new Point(-1,1),
+            new Point(-1,0), new Point(-1,-1), new Point(0,-1), new Point(1,-1)};
+
+    public boolean[][] doZhangSuenThinning(final boolean[][] givenImage, boolean changeGivenImage) {
+        boolean[][] binaryImage;
         if (changeGivenImage) {
             binaryImage = givenImage;
         } else {
@@ -21,80 +24,75 @@ public class ZhangSuenGenerator {
                 for (int x = 1; x + 1 < binaryImage[y].length; x++) {
                     a = getA(binaryImage, y, x);
                     b = getB(binaryImage, y, x);
-                    if (binaryImage[y][x] == 1 && 2 <= b && b <= 6 && a == 1
-                            && (binaryImage[y - 1][x] * binaryImage[y][x + 1] * binaryImage[y + 1][x] == 0)
-                            && (binaryImage[y][x + 1] * binaryImage[y + 1][x] * binaryImage[y][x - 1] == 0)) {
+                    if (binaryImage[y][x] == true && 2 <= b && b <= 6 && a == 1
+                            && (binaryImage[y - 1][x] == false || binaryImage[y][x + 1] == false || binaryImage[y + 1][x] == false)
+                            && (binaryImage[y][x + 1] == false || binaryImage[y + 1][x] == false || binaryImage[y][x - 1] == false)) {
                         pointsToChange.add(new Point(x, y));
-//binaryImage[y][x] = 0;
                         hasChange = true;
                     }
                 }
             }
             for (Point point : pointsToChange) {
-                binaryImage[point.getY()][point.getX()] = 0;
+                binaryImage[point.getY()][point.getX()] = false;
             }
             pointsToChange.clear();
             for (int y = 1; y + 1 < binaryImage.length; y++) {
                 for (int x = 1; x + 1 < binaryImage[y].length; x++) {
                     a = getA(binaryImage, y, x);
                     b = getB(binaryImage, y, x);
-                    if (binaryImage[y][x] == 1 && 2 <= b && b <= 6 && a == 1
-                            && (binaryImage[y - 1][x] * binaryImage[y][x + 1] * binaryImage[y][x - 1] == 0)
-                            && (binaryImage[y - 1][x] * binaryImage[y + 1][x] * binaryImage[y][x - 1] == 0)) {
+                    if (binaryImage[y][x] == true && 2 <= b && b <= 6 && a == 1
+                            && (binaryImage[y - 1][x] == false || binaryImage[y][x + 1] == false || binaryImage[y][x - 1] == false)
+                            && (binaryImage[y - 1][x] == false || binaryImage[y + 1][x] == false || binaryImage[y][x - 1] == false)) {
                         pointsToChange.add(new Point(x, y));
                         hasChange = true;
                     }
                 }
             }
             for (Point point : pointsToChange) {
-                binaryImage[point.getY()][point.getX()] = 0;
+                binaryImage[point.getY()][point.getX()] = false;
             }
             pointsToChange.clear();
         } while (hasChange);
         return binaryImage;
     }
 
-    private int getA(int[][] binaryImage, int y, int x) {
+    private int getA(boolean[][] binaryImage, int y, int x) {
         int count = 0;
-//p2 p3
-        if (y - 1 >= 0 && x + 1 < binaryImage[y].length && binaryImage[y - 1][x] == 0 && binaryImage[y - 1][x + 1] == 1) {
+        if (y - 1 >= 0 && x + 1 < binaryImage[y].length && binaryImage[y - 1][x] == false && binaryImage[y - 1][x + 1] == true) {
             count++;
         }
-//p3 p4
-        if (y - 1 >= 0 && x + 1 < binaryImage[y].length && binaryImage[y - 1][x + 1] == 0 && binaryImage[y][x + 1] == 1) {
+        if (y - 1 >= 0 && x + 1 < binaryImage[y].length && binaryImage[y - 1][x + 1] == false && binaryImage[y][x + 1] == true) {
             count++;
         }
-//p4 p5
-        if (y + 1 < binaryImage.length && x + 1 < binaryImage[y].length && binaryImage[y][x + 1] == 0 && binaryImage[y + 1][x + 1] == 1) {
+        if (y + 1 < binaryImage.length && x + 1 < binaryImage[y].length && binaryImage[y][x + 1] == false && binaryImage[y + 1][x + 1] == true) {
             count++;
         }
-//p5 p6
-        if (y + 1 < binaryImage.length && x + 1 < binaryImage[y].length && binaryImage[y + 1][x + 1] == 0 && binaryImage[y + 1][x] == 1) {
+        if (y + 1 < binaryImage.length && x + 1 < binaryImage[y].length && binaryImage[y + 1][x + 1] == false && binaryImage[y + 1][x] == true) {
             count++;
         }
-//p6 p7
-        if (y + 1 < binaryImage.length && x - 1 >= 0 && binaryImage[y + 1][x] == 0 && binaryImage[y + 1][x - 1] == 1) {
+        if (y + 1 < binaryImage.length && x - 1 >= 0 && binaryImage[y + 1][x] == false && binaryImage[y + 1][x - 1] == true) {
             count++;
         }
-//p7 p8
-        if (y + 1 < binaryImage.length && x - 1 >= 0 && binaryImage[y + 1][x - 1] == 0 && binaryImage[y][x - 1] == 1) {
+        if (y + 1 < binaryImage.length && x - 1 >= 0 && binaryImage[y + 1][x - 1] == false && binaryImage[y][x - 1] == true) {
             count++;
         }
-//p8 p9
-        if (y - 1 >= 0 && x - 1 >= 0 && binaryImage[y][x - 1] == 0 && binaryImage[y - 1][x - 1] == 1) {
+        if (y - 1 >= 0 && x - 1 >= 0 && binaryImage[y][x - 1] == false && binaryImage[y - 1][x - 1] == true) {
             count++;
         }
-//p9 p2
-        if (y - 1 >= 0 && x - 1 >= 0 && binaryImage[y - 1][x - 1] == 0 && binaryImage[y - 1][x] == 1) {
+        if (y - 1 >= 0 && x - 1 >= 0 && binaryImage[y - 1][x - 1] == false && binaryImage[y - 1][x] == true) {
             count++;
         }
         return count;
     }
 
-    private int getB(int[][] binaryImage, int y, int x) {
-        return binaryImage[y - 1][x] + binaryImage[y - 1][x + 1] + binaryImage[y][x + 1]
-                + binaryImage[y + 1][x + 1] + binaryImage[y + 1][x] + binaryImage[y + 1][x - 1]
-                + binaryImage[y][x - 1] + binaryImage[y - 1][x - 1];
+    private int getB(boolean[][] binaryImage, int y, int x) {
+        int accumulator = 0;
+        Point point = new Point(x,y);
+        for (int i=0;i<8;i++) {
+            Point currentPoint = point.add(direction[i]);
+            if (binaryImage[currentPoint.y][currentPoint.x]) accumulator+=1;
+        }
+        return accumulator;
     }
 }
 
