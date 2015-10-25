@@ -454,7 +454,6 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision2_detectAll (
 
 
 
-
 JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_Vision3_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas){
     NativeBitmap* nCanvas = convertBitmapToNative(env, canvas);
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
