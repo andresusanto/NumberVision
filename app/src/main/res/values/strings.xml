@@ -7,4 +7,5 @@
     <string name="title_activity_detect_warna">DetectWarnaActivity</string>
     <string name="title_activity_equaligram_selector">EqualigramSelector</string>
     <string name="title_activity_equaligram_main">EqualigramMain</string>
+    <string name="title_activity_vision1">Vision1</string>
 </resources>

@@ -25,7 +25,7 @@ public class Selector extends AppCompatActivity {
                 i = new Intent(this, EqualigramSelector.class);
                 break;
             case R.id.button4 :
-                i = new Intent(this, DetectWarnaActivity.class);
+                i = new Intent(this, Vision1.class);
                 break;
             case R.id.button5 :
                 i = new Intent(this, DetectWarnaActivity.class);
