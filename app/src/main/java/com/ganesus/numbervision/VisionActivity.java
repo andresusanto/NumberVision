@@ -53,8 +53,10 @@ public class VisionActivity extends AppCompatActivity {
             bmp.recycle();
 
             boolean[][] boolImage = nativeBitmap.convertToBoolmage();
+            boolean[][] boolImage2 = nativeBitmap.convertToBoolmage();
 
-            //print image before thinning
+
+            /*//print image before thinning
             Log.d("DEBUG","Before Thinning");
             for (int i=0;i<h;i++) {
                 StringBuilder line = new StringBuilder("");
@@ -77,13 +79,29 @@ public class VisionActivity extends AppCompatActivity {
                     else line.append("0");
                 }
                 Log.d("DEBUG",line.toString());
-            }
+            }*/
 
             ChainCodeGenerator ccg = new ChainCodeGenerator();
             List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.getBorderInfos(boolImage,w,h);
 
+            ToNxN compressor = new ToNxN(5);
+
             for (int i = 0 ; i < borderInfos.size(); i++){
                 Log.i("NUMVISION", borderInfos.get(i).chainCodes);
+                if (borderInfos.get(i).chainCodes.length() > 10) {
+                    boolean[][] compressImage = compressor.singleToNxN(borderInfos.get(i),boolImage2);
+
+                    for (int j=0;j<5;j++) {
+                        StringBuilder line = new StringBuilder("");
+                        for (int k=0;k<5;k++) {
+                            if (compressImage[j][k]) line.append("1");
+                            else line.append("0");
+                        }
+                        Log.d("DEBUG",line.toString());
+                    }
+
+                }
+
 
             }
             Log.d("DEBUG","Sudah selesai");
