@@ -53,6 +53,10 @@
             android:name=".Vision3"
             android:label="@string/title_activity_vision3" >
         </activity>
+        <activity
+            android:name=".Vision4"
+            android:label="@string/title_activity_vision4" >
+        </activity>
     </application>
 
 </manifest>

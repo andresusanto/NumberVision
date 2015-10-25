@@ -5,10 +5,12 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
+import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 
 import com.ganesus.numbervision.engine.ChainCodeGenerator;
@@ -18,19 +20,19 @@ import com.ganesus.numbervision.engine.ToNxN;
 
 import java.util.List;
 
-public class VisionActivity extends AppCompatActivity {
+public class Vision4 extends AppCompatActivity {
     private static final int RESULT_LOAD_IMAGE = 1212;
     private Interpretator interpretator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_vision);
+        setContentView(R.layout.activity_vision4);
 
         interpretator = new Interpretator(getResources(), R.raw.knowledge);
     }
 
-    public void onClickTest(View v){
+    public void klikGallery(View v){
         Intent i = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         startActivityForResult(i, RESULT_LOAD_IMAGE);
     }
@@ -96,10 +98,9 @@ public class VisionActivity extends AppCompatActivity {
                 if (borderInfos.get(i).chainCodes.length() > 10) {
                     boolean[][] compressImage = compressor.singleToNxN(borderInfos.get(i),boolImage2);
 
-                    //Ingat ukuran akhir adalah (N + 2) * (N + 2)
-                    for (int j=0;j<7;j++) {
+                    for (int j=0;j<5;j++) {
                         StringBuilder line = new StringBuilder("");
-                        for (int k=0;k<7;k++) {
+                        for (int k=0;k<5;k++) {
                             if (compressImage[j][k]) line.append("1");
                             else line.append("0");
                         }
@@ -107,8 +108,6 @@ public class VisionActivity extends AppCompatActivity {
                     }
 
                 }
-
-
             }
             Log.d("DEBUG","Sudah selesai");
         }

@@ -13,6 +13,12 @@ public class NativeBitmap {
 
     public static class RGB{
         int alpha, red, green, blue;
+        public RGB(){}
+        public RGB( int _red, int _green, int _blue) {
+            red = _red;
+            green = _green;
+            blue = _blue;
+        }
     };
 
     public NativeBitmap(int width, int height) {
@@ -168,6 +174,27 @@ public class NativeBitmap {
         return image;
     }
 
+    public Bitmap draw(boolean[][] source){
+        int width = source[0].length; int height = source.length;
+        Bitmap.Config conf = Bitmap.Config.ARGB_8888;
+        Bitmap canvas = Bitmap.createBitmap(width, height, conf);
+        int[] _pixels = new int[width * height];
+
+        int warna = convertArgbToInt(new RGB(128, 128, 128));
+
+        for (int i=0;i<height;i++) {
+            for (int j = 0; j < width; j++) {
+                if (source[i][j]){
+                    _pixels[i * width + j] = warna;
+                }
+            }
+        }
+
+        canvas.setPixels(_pixels, 0, width, 0, 0, width, height);
+
+        return canvas;
+    }
+
     public NativeBitmap(Bitmap bitmap){
         width = bitmap.getWidth();
         height = bitmap.getHeight();
@@ -202,7 +229,5 @@ public class NativeBitmap {
         }
         this.pixels = _pixels;
     }
-
-
 
 }
