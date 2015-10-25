@@ -91,9 +91,10 @@ public class VisionActivity extends AppCompatActivity {
                 if (borderInfos.get(i).chainCodes.length() > 10) {
                     boolean[][] compressImage = compressor.singleToNxN(borderInfos.get(i),boolImage2);
 
-                    for (int j=0;j<5;j++) {
+                    //Ingat ukuran akhir adalah (N + 2) * (N + 2)
+                    for (int j=0;j<7;j++) {
                         StringBuilder line = new StringBuilder("");
-                        for (int k=0;k<5;k++) {
+                        for (int k=0;k<7;k++) {
                             if (compressImage[j][k]) line.append("1");
                             else line.append("0");
                         }

@@ -203,6 +203,6 @@ public class EqualigramMain extends AppCompatActivity {
     public native Bitmap applyAlgoStepBmp(ByteBuffer bitmem,int L);
 
     static {
-        System.loadLibrary("equaligram");
+        System.loadLibrary("numbervision");
     }
 }

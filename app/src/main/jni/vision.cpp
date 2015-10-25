@@ -1,23 +1,4 @@
-// EQUALIGRAM - EQUALIZER INSTAGRAM
-// Andre Susanto, M Yafi, Ramandika P, Kevin Yudi
-// Pengcit - IF ITB
-
-#include "fungsi.h"
-
-#define STABILIZATION_FACTOR 4 // faktor untuk stabilisasi (copot noise dari chain code)
-
-// supaya bisa dipanggil sama java
-extern "C"
-{
-JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision1_detectAll (JNIEnv * env, jobject obj, jobject bitmap);
-}
-
-
-/////////////////////////////////////////////////////////////////////////////////////
-// helper class and functions
-/////////////////////////////////////////////////////////////////////////////////////
-
-
+#include "vision.h"
 
 Point get_next_traverse_point(Point current_black,Point current_traverse_point) {
     Point next = current_traverse_point;
@@ -174,10 +155,6 @@ vector<BorderInfo> get_border_infos(bool **image,int length,int height) {
 }
 
 
-////////////////////////////////////////////////////////////////////////////////////////
-// ALGORITMA MATCHER
-////////////////////////////////////////////////////////////////////////////////////////
-
 
 vector<ECode> stabileData(string original){
     vector<ECode> training;
@@ -263,7 +240,7 @@ float calculateChain (string strKnowledge, string strTest ){
     return currentScore;
 }
 
-vector<Knowledge> createKnowledge(){
+vector<Knowledge> createKnowledgeV1(){
     vector<Knowledge> result;
 
     Knowledge satu, dua, tiga, empat, lima, enam, tujuh, delapan, sembilan, nol;
@@ -305,8 +282,8 @@ vector<Knowledge> createKnowledge(){
     return result;
 }
 
-char guessChain(string chainCode){
-    vector<Knowledge> knowledge = createKnowledge();
+char guessChainV1(string chainCode){
+    vector<Knowledge> knowledge = createKnowledgeV1();
 
     char currentChar = knowledge[0].meaning;
     float currentMax = calculateChain(knowledge[0].data, chainCode);
@@ -321,68 +298,139 @@ char guessChain(string chainCode){
     return currentChar;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////
+vector<Knowledge> createKnowledge(const char* path){
+    vector<Knowledge> result;
+    LOGD("Loaded Knowledge File %s", path);
+    ifstream infile(path);
+
+    char tmp_char; string tmp_string;
+    while (infile >> tmp_char >> tmp_string)
+    {
+        Knowledge tmp_knowledge;
+        tmp_knowledge.meaning = tmp_char;
+        tmp_knowledge.data = tmp_string;
+
+        result.push_back(tmp_knowledge);
+    }
+
+    return result;
+}
+
+char guessChain(string chainCode, vector<Knowledge> knowledge){
 
 
-JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision1_detectAll (JNIEnv * env, jobject obj, jobject bitmap){
-    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
-    bool **image;
-
-    image = new bool*[nativeBitmap->bitmapInfo.height];
-    for (int i=0;i<nativeBitmap->bitmapInfo.height;i++) {
-        image[i] = new bool[nativeBitmap->bitmapInfo.width];
-        for (int j=0;j<nativeBitmap->bitmapInfo.width;j++) {
-            ARGB warna;
-            convertIntToArgb(nativeBitmap->pixels[i * nativeBitmap->bitmapInfo.width + j], &warna);
-
-            image[i][j] = !(warna.blue == 255 && warna.green == 255 && warna.red == 255);
+    char currentChar = knowledge[0].meaning;
+    float currentMax = calculateChain(knowledge[0].data, chainCode);
+    for (int i = 1 ; i < knowledge.size(); i++){
+        float rate = calculateChain(knowledge[i].data, chainCode);
+        if (rate > currentMax){
+            currentMax = rate;
+            currentChar = knowledge[i].meaning;
         }
     }
 
-    vector<DetectedChar> interpretation;
-    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
-    delete nativeBitmap;
+    return currentChar;
+}
 
 
-    for (int i=0;i<border_infos.size();i++) {
-        BorderInfo border_info = border_infos[i];
-        stringstream sskode;
+bool is_point(Point point,bool **image) {
 
-        for (int j=0;j<border_info.chain_codes.size();j++) {
-            sskode << border_info.chain_codes[j];
-        }
+    int x = point.x;
+    int y = point.y;
 
-        DetectedChar detectedChar;
-        detectedChar.start = border_info.start_point.x;
-        detectedChar.value = guessChain(sskode.str());
-        interpretation.push_back(detectedChar);
+    return image[y][x] && !image[y-1][x] && !image[y][x-1] && !image[y+1][x] && !image[y][x+1];
+}
 
-        //ss << guessChain(sskode.str());
-        // LOGD("CHAIN CODE: %s", sskode.str().c_str());
-        // LOGD("KIRA KIRA = %d \n", match_chain_code(test,ukuran,numbers, numbers.size()));
+float generateOtsu(uint32_t* histogram, uint32_t total) {
+    int sum = 0;
+    for (int i=1;i<256; ++i) sum+= i *histogram[i];
 
-    }
+    int sumB = 0;
+    int wB = 0;
+    int wF = 0;
+    int mB = 0;
+    int mF = 0;
+    float max = 0.0f;
+    float between = 0.0f;
+    float threshold1 = 0.0f;
+    float threshold2 = 0.0f;
 
+    for (int i=0;i<256;++i) {
+        wB += histogram[i];
+        if (wB == 0) continue;
+        wF = total - wB;
+        if (wF == 0) break;
 
-    stringstream ss;
+        sumB += i * histogram[i];
 
-    while(interpretation.size() > 0){
-        int minValue = interpretation[0].start;
-        int currentMin = 0;
-        for (int i = 1; i < interpretation.size(); i++){
-            if (interpretation[i].start < minValue){
-                minValue = interpretation[i].start;
-                currentMin = i;
+        mB = sumB / wB;
+        mF = (sum - sumB) /wF;
+
+        between = wB * wF * (mB - mF) * (mB - mF);
+        if (between >= max) {
+            threshold1 = i;
+            if ( between > max ) {
+                threshold2 = i;
             }
+            max = between;
         }
-        ss << interpretation[currentMin].value;
-        interpretation.erase(interpretation.begin() + currentMin);
     }
 
-    // [1] adalah ekspresi input, [2] adalah hasil perhitungan
-    std::string tes[] = { ss.str().c_str(), "44" };
-    jobjectArray hasil2 = createJavaArray(env, 2, tes);
+    return (threshold1 + threshold2) / 2.0f;
+}
 
-    return hasil2;
+
+bool** convertToBoolmage(NativeBitmap* nativeBitmap){
+    bool** image = new bool*[nativeBitmap->bitmapInfo.height];
+    NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
+
+    uint32_t nBitmapSize = pBitmap->bitmapInfo.height * pBitmap->bitmapInfo.width;
+    uint32_t* histogram = createHistogram(pBitmap);
+    uint32_t* color_transform = cumulative_equalization(histogram);
+
+    NativeBitmap* gBitmap = transformNativeBitmap(pBitmap, color_transform);
+    delete pBitmap;
+
+    histogram = createHistogram(gBitmap);
+
+    float otsu = generateOtsu(histogram, nBitmapSize);
+
+    //FILE* file = fopen("/sdcard/textTest.txt","w+");
+
+    //stringstream ss;
+
+
+    for (int i=0;i<gBitmap->bitmapInfo.height;i++) {
+        image[i] = new bool[gBitmap->bitmapInfo.width];
+        for (int j=0;j<gBitmap->bitmapInfo.width;j++) {
+            ARGB warna;
+            convertIntToArgb(gBitmap->pixels[i * gBitmap->bitmapInfo.width + j], &warna);
+
+            image[i][j] = (warna.red > otsu);
+
+
+            //if (warna.red > otsu)
+            //    ss << "image[" << i << "][" << j << "] = true;\n"; //LOGD("image[%d][%d] = true;", i, j);
+            //else
+            //    ss << "image[" << i << "][" << j << "] = false;\n"; //LOGD("image[%d][%d] = false;", i, j);
+
+            //fputs(ss.str().c_str(), file);
+            //ss.str(string());
+        }
+    }
+    //fclose(file);
+
+    for (int i=0;i<gBitmap->bitmapInfo.width;i++) {
+        image[0][i] = false;
+        image[gBitmap->bitmapInfo.height-1][i] = false;
+    }
+
+    for (int i=0;i<gBitmap->bitmapInfo.height;i++) {
+        image[i][0] = false;
+        image[i][gBitmap->bitmapInfo.width-1] = false;
+    }
+
+    delete gBitmap;
+
+    return image;
 }

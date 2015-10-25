@@ -16,6 +16,8 @@
 #include <math.h>
 #include <queue>
 #include <sstream>
+#include <sstream>
+#include <fstream>
 
 #include "nativebitmap.h"
 
@@ -25,9 +27,9 @@
 
 using namespace std;
 
-
 typedef struct{
     char value;
+    string chain; // untuk keperluan learning... mager :D
     int start;
 } DetectedChar;
 
