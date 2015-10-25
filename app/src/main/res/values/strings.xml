@@ -4,4 +4,7 @@
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
     <string name="title_activity_selector">Selector</string>
+    <string name="title_activity_detect_warna">DetectWarnaActivity</string>
+    <string name="title_activity_equaligram_selector">EqualigramSelector</string>
+    <string name="title_activity_equaligram_main">EqualigramMain</string>
 </resources>
