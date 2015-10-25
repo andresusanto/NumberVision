@@ -36,7 +36,7 @@ public class Vision4 extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_vision4);
 
-        interpretator = new Interpretator(getResources(), R.raw.knowledge);
+        interpretator = new Interpretator(getResources(), R.raw.belok);
     }
 
     public void klikGallery(View v){
@@ -81,10 +81,6 @@ public class Vision4 extends AppCompatActivity {
 
             Bitmap hasil = nativeBitmap.draw(boolImage);
 
-            List<TurnInterpretator> tclearns = new ArrayList();
-            tclearns.add(new TurnInterpretator("RRRR",'0'));
-            tclearns.add(new TurnInterpretator("RLLRRRRLLRR",'H'));
-
             ChainCodeGenerator ccg = new ChainCodeGenerator();
             List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.sorter(ccg.getBorderInfos(boolImage,w,h));
 
@@ -109,7 +105,6 @@ public class Vision4 extends AppCompatActivity {
                     TurnCodeImpl turnCode = new TurnCodeImpl();
 
 
-                    Log.d("TES", ccg.expander(mini_chain));
 
                     String kodeBelok = turnCode.generateTurn(ccg.expander(mini_chain));
 
@@ -117,7 +112,10 @@ public class Vision4 extends AppCompatActivity {
                     outText.append("Kode Belok: ");
                     outText.append(kodeBelok);
                     outText.append("\nInterpret: ");
-                    outText.append(TurnInterpretator.intepret(kodeBelok, tclearns));
+                    outText.append(interpretator.guessChain(kodeBelok));
+
+                    Log.d("TES", kodeBelok);
+
 
                     outText.append("\n\n");
                 }
