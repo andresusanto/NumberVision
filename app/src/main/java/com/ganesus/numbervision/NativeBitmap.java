@@ -176,8 +176,9 @@ public class NativeBitmap {
         bitmap.getPixels(pixels, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
     }
 
-    public NativeBitmap smooth() {
-        NativeBitmap smoothBitmap = new NativeBitmap(width,height);
+    public void smooth() {
+        int _pixels[] = new int[width * height];
+
         for (int i=0;i<height;i++) {
             for (int j=0;j<width;j++) {
                 Point currentPoint = new Point(j,i);
@@ -196,10 +197,10 @@ public class NativeBitmap {
                 rgbAccum.red /= nNeighbor;
                 rgbAccum.green /= nNeighbor;
                 rgbAccum.blue /= nNeighbor;
-                smoothBitmap.pixels[i * width + j] = convertArgbToInt(rgbAccum);
+                _pixels[i * width + j] = convertArgbToInt(rgbAccum);
             }
         }
-        return smoothBitmap;
+        this.pixels = _pixels;
     }
 
 
