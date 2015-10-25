@@ -1,23 +1,4 @@
-// EQUALIGRAM - EQUALIZER INSTAGRAM
-// Andre Susanto, M Yafi, Ramandika P, Kevin Yudi
-// Pengcit - IF ITB
-
-#include "fungsi.h"
-
-#define STABILIZATION_FACTOR 4 // faktor untuk stabilisasi (copot noise dari chain code)
-
-// supaya bisa dipanggil sama java
-extern "C"
-{
-JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision1_detectAll (JNIEnv * env, jobject obj, jobject bitmap);
-}
-
-
-/////////////////////////////////////////////////////////////////////////////////////
-// helper class and functions
-/////////////////////////////////////////////////////////////////////////////////////
-
-
+#include "vision.h"
 
 Point get_next_traverse_point(Point current_black,Point current_traverse_point) {
     Point next = current_traverse_point;
@@ -174,10 +155,6 @@ vector<BorderInfo> get_border_infos(bool **image,int length,int height) {
 }
 
 
-////////////////////////////////////////////////////////////////////////////////////////
-// ALGORITMA MATCHER
-////////////////////////////////////////////////////////////////////////////////////////
-
 
 vector<ECode> stabileData(string original){
     vector<ECode> training;
@@ -319,70 +296,4 @@ char guessChain(string chainCode){
     }
 
     return currentChar;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-
-JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision1_detectAll (JNIEnv * env, jobject obj, jobject bitmap){
-    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
-    bool **image;
-
-    image = new bool*[nativeBitmap->bitmapInfo.height];
-    for (int i=0;i<nativeBitmap->bitmapInfo.height;i++) {
-        image[i] = new bool[nativeBitmap->bitmapInfo.width];
-        for (int j=0;j<nativeBitmap->bitmapInfo.width;j++) {
-            ARGB warna;
-            convertIntToArgb(nativeBitmap->pixels[i * nativeBitmap->bitmapInfo.width + j], &warna);
-
-            image[i][j] = !(warna.blue == 255 && warna.green == 255 && warna.red == 255);
-        }
-    }
-
-    vector<DetectedChar> interpretation;
-    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
-    delete nativeBitmap;
-
-
-    for (int i=0;i<border_infos.size();i++) {
-        BorderInfo border_info = border_infos[i];
-        stringstream sskode;
-
-        for (int j=0;j<border_info.chain_codes.size();j++) {
-            sskode << border_info.chain_codes[j];
-        }
-
-        DetectedChar detectedChar;
-        detectedChar.start = border_info.start_point.x;
-        detectedChar.value = guessChain(sskode.str());
-        interpretation.push_back(detectedChar);
-
-        //ss << guessChain(sskode.str());
-        // LOGD("CHAIN CODE: %s", sskode.str().c_str());
-        // LOGD("KIRA KIRA = %d \n", match_chain_code(test,ukuran,numbers, numbers.size()));
-
-    }
-
-
-    stringstream ss;
-
-    while(interpretation.size() > 0){
-        int minValue = interpretation[0].start;
-        int currentMin = 0;
-        for (int i = 1; i < interpretation.size(); i++){
-            if (interpretation[i].start < minValue){
-                minValue = interpretation[i].start;
-                currentMin = i;
-            }
-        }
-        ss << interpretation[currentMin].value;
-        interpretation.erase(interpretation.begin() + currentMin);
-    }
-
-    // [1] adalah ekspresi input, [2] adalah hasil perhitungan
-    std::string tes[] = { ss.str().c_str(), "44" };
-    jobjectArray hasil2 = createJavaArray(env, 2, tes);
-
-    return hasil2;
 }

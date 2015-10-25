@@ -63,6 +63,6 @@ public class Vision1 extends AppCompatActivity {
     public native String[] detectAll(Bitmap bitmap);
 
     static {
-        System.loadLibrary("vision1");
+        System.loadLibrary("numbervision");
     }
 }
