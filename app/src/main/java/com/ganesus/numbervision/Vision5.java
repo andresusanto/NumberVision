@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.media.Image;
 import android.net.Uri;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
@@ -25,17 +24,18 @@ import com.ganesus.numbervision.engine.ZhangSuenGenerator;
 
 import java.util.List;
 
-public class Vision4 extends AppCompatActivity {
+public class Vision5 extends AppCompatActivity {
     private static final int RESULT_LOAD_IMAGE = 1212;
     private Interpretator interpretator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_vision4);
+        setContentView(R.layout.activity_vision5);
 
-        interpretator = new Interpretator(getResources(), R.raw.knowledge);
+        interpretator = new Interpretator(getResources(), R.raw.tipis);
     }
+
 
     public void klikGallery(View v){
         Intent i = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -79,11 +79,11 @@ public class Vision4 extends AppCompatActivity {
 
             Bitmap hasil = nativeBitmap.draw(boolImage);
 
-            //ZhangSuenGenerator zhangSuenGenerator = new ZhangSuenGenerator();
-            //zhangSuenGenerator.doZhangSuenThinning(boolImage,true);
+            ZhangSuenGenerator zhangSuenGenerator = new ZhangSuenGenerator();
+            zhangSuenGenerator.doZhangSuenThinning(boolImage,true);
 
-            //ImageView iv = (ImageView) findViewById(R.id.imageView);
-            //iv.setImageBitmap(nativeBitmap.draw(boolImage));
+            ImageView iv = (ImageView) findViewById(R.id.imageView);
+            iv.setImageBitmap(nativeBitmap.draw(boolImage));
 
             ChainCodeGenerator ccg = new ChainCodeGenerator();
             List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.sorter(ccg.getBorderInfos(boolImage,w,h));
@@ -92,40 +92,18 @@ public class Vision4 extends AppCompatActivity {
             StringBuilder outText = new StringBuilder();
 
             for (int i = 0 ; i < borderInfos.size(); i++){
-                if (borderInfos.get(i).chainCodes.length() > 10) {
-                    boolean[][] compressImage = compressor.singleToNxN(borderInfos.get(i),boolImage2);
+                if (borderInfos.get(i).chainCodes.length() > 0) {
+                    Log.d("DEBUG",borderInfos.get(i).chainCodes);
 
-                    StringBuilder line = new StringBuilder("");
-                    for (int j=0;j<7;j++) {
-
-                        for (int k=0;k<7;k++) {
-                            if (compressImage[j][k]) line.append("1");
-                            else line.append("0");
-                        }
-                        line.append("\n");
-                        //Log.d("DEBUG",line.toString());
-                    }
-                    String mini_chain = ccg.generateSingle(compressImage, 7, 7);
-                    TurnCodeImpl turnCode = new TurnCodeImpl();
-
-
-                    Log.d("TES", ccg.expander(mini_chain));
-
-                    String kodeBelok = turnCode.generateTurn(ccg.expander(mini_chain));
-
-                    outText.append(line);
-                    outText.append("Kode Belok: ");
-                    outText.append(kodeBelok);
-                    outText.append("\n\n");
+                    outText.append(interpretator.guessChain(borderInfos.get(i).chainCodes));
                 }
             }
 
-            TextView txtBelok = (TextView) findViewById(R.id.txtKodeBelok);
+            TextView txtBelok = (TextView) findViewById(R.id.txtInterpretasi);
             txtBelok.setText(outText.toString());
 
-            ImageView iv = (ImageView) findViewById(R.id.imageView);
-            iv.setImageBitmap(hasil);
-            Log.d("DEBUG","Sudah selesai");
+
+            Log.d("DEBUG", "Sudah selesai");
         }
     }
 }

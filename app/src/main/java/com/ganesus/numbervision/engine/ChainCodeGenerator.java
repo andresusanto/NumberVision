@@ -206,7 +206,7 @@ public class ChainCodeGenerator {
     public String expander(String old_cc){
         StringBuilder new_cc = new StringBuilder();
 
-        final int DESIRED = 212;
+        final int DESIRED = 173;
         for(int i = 0; i < old_cc.length(); ++i){
             for(int j = 0; j < DESIRED / old_cc.length(); ++j){
                 new_cc.append(old_cc.charAt(i));

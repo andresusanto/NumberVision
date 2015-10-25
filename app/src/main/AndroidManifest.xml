@@ -57,6 +57,10 @@
             android:name=".Vision4"
             android:label="@string/title_activity_vision4" >
         </activity>
+        <activity
+            android:name=".Vision5"
+            android:label="@string/title_activity_vision5" >
+        </activity>
     </application>
 
 </manifest>

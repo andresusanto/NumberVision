@@ -37,7 +37,7 @@ public class Selector extends AppCompatActivity {
                 i = new Intent(this, Vision4.class);
                 break;
             default :
-                i = new Intent(this, DetectWarnaActivity.class);
+                i = new Intent(this, Vision5.class);
                 break;
 
         }
