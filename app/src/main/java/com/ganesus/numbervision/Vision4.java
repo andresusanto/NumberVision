@@ -12,11 +12,15 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ImageView;
+import android.widget.TextView;
 
 import com.ganesus.numbervision.engine.ChainCodeGenerator;
 import com.ganesus.numbervision.engine.Interpretator;
 import com.ganesus.numbervision.engine.NativeBitmap;
 import com.ganesus.numbervision.engine.ToNxN;
+import com.ganesus.numbervision.engine.TurnCodeImpl;
+import com.ganesus.numbervision.engine.ZhangSuenGenerator;
 
 import java.util.List;
 
@@ -53,8 +57,18 @@ public class Vision4 extends AppCompatActivity {
             cursor.close();
 
             Bitmap bmp = BitmapFactory.decodeFile(picturePath);
+
+            if (bmp.getWidth() == 1632){
+                bmp = Bitmap.createBitmap(bmp, 546, 491, 549, 115);
+            }else if(bmp.getWidth() == 1024){
+                bmp = Bitmap.createBitmap(bmp, 345, 323, 390, 107);
+            }else if(bmp.getWidth() == 1019){
+                bmp = Bitmap.createBitmap(bmp, 341, 438, 332, 55);
+            }
+
             NativeBitmap nativeBitmap = new NativeBitmap(bmp);
             nativeBitmap.grayscaleBitmap();
+            nativeBitmap.smooth();
 
             int w = bmp.getWidth(); int h = bmp.getHeight();
             bmp.recycle();
@@ -62,53 +76,45 @@ public class Vision4 extends AppCompatActivity {
             boolean[][] boolImage = nativeBitmap.convertToBoolmage();
             boolean[][] boolImage2 = nativeBitmap.convertToBoolmage();
 
+            //ZhangSuenGenerator zhangSuenGenerator = new ZhangSuenGenerator();
+            //zhangSuenGenerator.doZhangSuenThinning(boolImage,true);
 
-            /*//print image before thinning
-            Log.d("DEBUG","Before Thinning");
-            for (int i=0;i<h;i++) {
-                StringBuilder line = new StringBuilder("");
-                for (int j=0;j<w;j++) {
-                    if (boolImage[i][j]) line.append("1");
-                    else line.append("0");
-                }
-                Log.d("DEBUG",line.toString());
-            }
-
-            ZhangSuenGenerator zhangSuenGenerator = new ZhangSuenGenerator();
-            zhangSuenGenerator.doZhangSuenThinning(boolImage,true);
-
-            //print image after thinning
-            Log.d("DEBUG","ZhangSuenThinning");
-            for (int i=0;i<h;i++) {
-                StringBuilder line = new StringBuilder("");
-                for (int j=0;j<w;j++) {
-                    if (boolImage[i][j]) line.append("1");
-                    else line.append("0");
-                }
-                Log.d("DEBUG",line.toString());
-            }*/
+            //ImageView iv = (ImageView) findViewById(R.id.imageView);
+            //iv.setImageBitmap(nativeBitmap.draw(boolImage));
 
             ChainCodeGenerator ccg = new ChainCodeGenerator();
             List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.getBorderInfos(boolImage,w,h);
 
             ToNxN compressor = new ToNxN(5);
+            StringBuilder outText = new StringBuilder();
 
             for (int i = 0 ; i < borderInfos.size(); i++){
                 Log.i("NUMVISION", borderInfos.get(i).chainCodes);
                 if (borderInfos.get(i).chainCodes.length() > 10) {
                     boolean[][] compressImage = compressor.singleToNxN(borderInfos.get(i),boolImage2);
 
-                    for (int j=0;j<5;j++) {
-                        StringBuilder line = new StringBuilder("");
-                        for (int k=0;k<5;k++) {
+                    StringBuilder line = new StringBuilder("");
+                    for (int j=0;j<7;j++) {
+
+                        for (int k=0;k<7;k++) {
                             if (compressImage[j][k]) line.append("1");
                             else line.append("0");
                         }
-                        Log.d("DEBUG",line.toString());
+                        line.append("\n");
+                        //Log.d("DEBUG",line.toString());
                     }
+                    String mini_chain = ccg.generateSingle(compressImage, 7, 7);
+                    TurnCodeImpl turnCode = new TurnCodeImpl();
 
+                    outText.append(line);
+                    outText.append("Kode Belok: ");
+                    outText.append(mini_chain);
+                    outText.append("\n\n");
                 }
             }
+
+            TextView txtBelok = (TextView) findViewById(R.id.txtKodeBelok);
+            txtBelok.setText(outText.toString());
             Log.d("DEBUG","Sudah selesai");
         }
     }

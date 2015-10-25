@@ -2,6 +2,7 @@ package com.ganesus.numbervision.engine;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 
 /**
@@ -174,5 +175,12 @@ public class ChainCodeGenerator {
         return borderInfos;
     }
 
-
+    public String generateSingle(boolean[][] image, int length, int height){
+        List<BorderInfo> borderInfos = getBorderInfos(image, length, height);
+        if (borderInfos.size() > 0){
+            return borderInfos.get(0).chainCodes;
+        }else{
+            return "";
+        }
+    }
 }
