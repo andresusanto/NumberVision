@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.Image;
 import android.net.Uri;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
@@ -67,14 +68,16 @@ public class Vision4 extends AppCompatActivity {
             }
 
             NativeBitmap nativeBitmap = new NativeBitmap(bmp);
-            nativeBitmap.grayscaleBitmap();
             nativeBitmap.smooth();
+            nativeBitmap.grayscaleBitmap();
 
             int w = bmp.getWidth(); int h = bmp.getHeight();
             bmp.recycle();
 
             boolean[][] boolImage = nativeBitmap.convertToBoolmage();
             boolean[][] boolImage2 = nativeBitmap.convertToBoolmage();
+
+            Bitmap hasil = nativeBitmap.draw(boolImage);
 
             //ZhangSuenGenerator zhangSuenGenerator = new ZhangSuenGenerator();
             //zhangSuenGenerator.doZhangSuenThinning(boolImage,true);
@@ -83,13 +86,12 @@ public class Vision4 extends AppCompatActivity {
             //iv.setImageBitmap(nativeBitmap.draw(boolImage));
 
             ChainCodeGenerator ccg = new ChainCodeGenerator();
-            List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.getBorderInfos(boolImage,w,h);
+            List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.sorter(ccg.getBorderInfos(boolImage,w,h));
 
             ToNxN compressor = new ToNxN(5);
             StringBuilder outText = new StringBuilder();
 
             for (int i = 0 ; i < borderInfos.size(); i++){
-                Log.i("NUMVISION", borderInfos.get(i).chainCodes);
                 if (borderInfos.get(i).chainCodes.length() > 10) {
                     boolean[][] compressImage = compressor.singleToNxN(borderInfos.get(i),boolImage2);
 
@@ -106,15 +108,20 @@ public class Vision4 extends AppCompatActivity {
                     String mini_chain = ccg.generateSingle(compressImage, 7, 7);
                     TurnCodeImpl turnCode = new TurnCodeImpl();
 
+                    String kodeBelok = turnCode.generateTurn(ccg.expander(mini_chain));
+
                     outText.append(line);
                     outText.append("Kode Belok: ");
-                    outText.append(mini_chain);
+                    outText.append(kodeBelok);
                     outText.append("\n\n");
                 }
             }
 
             TextView txtBelok = (TextView) findViewById(R.id.txtKodeBelok);
             txtBelok.setText(outText.toString());
+
+            ImageView iv = (ImageView) findViewById(R.id.imageView);
+            iv.setImageBitmap(hasil);
             Log.d("DEBUG","Sudah selesai");
         }
     }

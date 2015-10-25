@@ -156,7 +156,7 @@ public class NativeBitmap {
 
             for (int j=0;j< width;j++) {
                 RGB warna = convertIntToArgb(pixels[i * width + j]);
-                image[i][j] = (warna.red < otsu);
+                image[i][j] = (warna.red > otsu);
             }
         }
 

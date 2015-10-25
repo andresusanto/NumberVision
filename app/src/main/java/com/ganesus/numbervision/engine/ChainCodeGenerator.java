@@ -175,6 +175,25 @@ public class ChainCodeGenerator {
         return borderInfos;
     }
 
+    public List<BorderInfo> sorter(List<BorderInfo> origin){
+        List<BorderInfo> tmp = new LinkedList<>();
+
+        while(origin.size() > 0){
+            int cur_min = origin.get(0).startPoint.x;
+            int min_index = 0;
+            for (int i = 1; i < origin.size(); i++){
+                if (origin.get(i).startPoint.x < cur_min){
+                    min_index = i;
+                    cur_min = origin.get(i).startPoint.x;
+                }
+            }
+
+            tmp.add(origin.get(min_index));
+            origin.remove(min_index);
+        }
+        return tmp;
+    }
+
     public String generateSingle(boolean[][] image, int length, int height){
         List<BorderInfo> borderInfos = getBorderInfos(image, length, height);
         if (borderInfos.size() > 0){
@@ -182,5 +201,18 @@ public class ChainCodeGenerator {
         }else{
             return "";
         }
+    }
+
+    public String expander(String old_cc){
+        StringBuilder new_cc = new StringBuilder();
+
+        final int DESIRED = 212;
+        for(int i = 0; i < old_cc.length(); ++i){
+            for(int j = 0; j < DESIRED / old_cc.length(); ++j){
+                new_cc.append(old_cc.charAt(i));
+            }
+        }
+
+        return new_cc.toString();
     }
 }
