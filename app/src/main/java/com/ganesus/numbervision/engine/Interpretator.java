@@ -115,6 +115,7 @@ public class Interpretator {
             iteratorKnowledge++;
 
             if (iteratorKnowledge == knowledgeSize){
+                if ( i < 0 ) i = 0;
                 for (; i < testSize; i++){
                     currentScore -= (float)test.get(i).value / testChains;
                 }

@@ -18,7 +18,7 @@ public class TurnCodeImpl implements TurnCode{
         StringBuilder ret = new StringBuilder();
         for(int i = 0; i + LENGTH_TAKE < code.length(); ){
             String sleft = code.substring(i, i + LENGTH_TAKE / 2);
-            String sright = code.substring(i + (LENGTH_TAKE / 2), i + i + (LENGTH_TAKE/2)+ LENGTH_TAKE/2);
+            String sright = code.substring(i + (LENGTH_TAKE / 2), Math.max(code.length(),i + LENGTH_TAKE));
             double dl = degreeByVote(sleft);
             double dr = degreeByVote(sright);
             double diff = Math.abs(dl - dr);
