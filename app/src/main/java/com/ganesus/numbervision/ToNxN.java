@@ -8,7 +8,7 @@ import java.util.List;
  */
 public class ToNxN {
     private int N;
-    private final double percentage=0.5;
+    private final double percentage=0.3;
 
     public ToNxN(int N){
         this.N=N;
@@ -75,22 +75,27 @@ public class ToNxN {
         int smallHeight=height/N;
 
         //Find majority of black in each cell
-        Point iterate=botLeft;
+        Point iterate=new Point(0,0);
         for(int row=1;row<=N;row++) {
             iterate.setY(botLeft.getY() + (row - 1) * smallHeight);
             for (int col = 1; col <= N; col++) {
+
                 iterate.setX(botLeft.getX()+(col-1)*smallWidth);
                 //count majority
-                int imax=iterate.getX()+smallWidth-1;
-                int jmax=iterate.getY()+smallHeight-1;
+                int imax=iterate.getY()+smallHeight-1;
+                int jmax=iterate.getX()+smallWidth-1;
+
                 int counter=0;int black=0;
-                for(int i=iterate.getX();i<=imax && i<=upRight.getX();i++)
-                    for(int j=iterate.getY();j<=jmax && j<=upRight.getY();j++) {
-                        if(boolImg[i][j]==true) black++;
+                for(int i=iterate.getY();i<=imax && i<=upRight.getY();i++) {
+                    for (int j = iterate.getX(); j <= jmax && j <= upRight.getX(); j++) {
+                        if (boolImg[i][j] == true){
+                            black++;
+                        }
                         counter++;
                     }
+                }
                 //Count percentage
-                if(black/counter>percentage){
+                if(counter !=0 && ((float)black)/counter>percentage){
                     newBoolImg[row][col]=true;
                 }else newBoolImg[row][col]=false;
             }
