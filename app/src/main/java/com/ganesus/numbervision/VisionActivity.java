@@ -14,13 +14,15 @@ import android.view.View;
 import java.util.List;
 
 public class VisionActivity extends AppCompatActivity {
-
     private static int RESULT_LOAD_IMAGE = 1212;
+    private Interpretator interpretator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_vision);
+
+        interpretator = new Interpretator(getResources(), R.raw.knowledge);
     }
 
     public void onClickTest(View v){
@@ -81,14 +83,9 @@ public class VisionActivity extends AppCompatActivity {
             List<ChainCodeGenerator.BorderInfo> borderInfos = ccg.getBorderInfos(boolImage,w,h);
 
             for (int i = 0 ; i < borderInfos.size(); i++){
-                StringBuffer sb = new StringBuffer();
-                for (int j = 0 ; j < borderInfos.get(i).chainCodes.length(); j++){
-                    sb.append(borderInfos.get(i).chainCodes.charAt(j));
-                }
+                Log.i("NUMVISION", borderInfos.get(i).chainCodes);
 
-                Log.i("NUMVISION", sb.toString());
             }
-
             Log.d("DEBUG","Sudah selesai");
         }
 
