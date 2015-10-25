@@ -240,7 +240,7 @@ float calculateChain (string strKnowledge, string strTest ){
     return currentScore;
 }
 
-vector<Knowledge> createKnowledge(){
+vector<Knowledge> createKnowledgeV1(){
     vector<Knowledge> result;
 
     Knowledge satu, dua, tiga, empat, lima, enam, tujuh, delapan, sembilan, nol;
@@ -282,8 +282,8 @@ vector<Knowledge> createKnowledge(){
     return result;
 }
 
-char guessChain(string chainCode){
-    vector<Knowledge> knowledge = createKnowledge();
+char guessChainV1(string chainCode){
+    vector<Knowledge> knowledge = createKnowledgeV1();
 
     char currentChar = knowledge[0].meaning;
     float currentMax = calculateChain(knowledge[0].data, chainCode);
@@ -296,4 +296,141 @@ char guessChain(string chainCode){
     }
 
     return currentChar;
+}
+
+vector<Knowledge> createKnowledge(const char* path){
+    vector<Knowledge> result;
+    LOGD("Loaded Knowledge File %s", path);
+    ifstream infile(path);
+
+    char tmp_char; string tmp_string;
+    while (infile >> tmp_char >> tmp_string)
+    {
+        Knowledge tmp_knowledge;
+        tmp_knowledge.meaning = tmp_char;
+        tmp_knowledge.data = tmp_string;
+
+        result.push_back(tmp_knowledge);
+    }
+
+    return result;
+}
+
+char guessChain(string chainCode, vector<Knowledge> knowledge){
+
+
+    char currentChar = knowledge[0].meaning;
+    float currentMax = calculateChain(knowledge[0].data, chainCode);
+    for (int i = 1 ; i < knowledge.size(); i++){
+        float rate = calculateChain(knowledge[i].data, chainCode);
+        if (rate > currentMax){
+            currentMax = rate;
+            currentChar = knowledge[i].meaning;
+        }
+    }
+
+    return currentChar;
+}
+
+
+bool is_point(Point point,bool **image) {
+
+    int x = point.x;
+    int y = point.y;
+
+    return image[y][x] && !image[y-1][x] && !image[y][x-1] && !image[y+1][x] && !image[y][x+1];
+}
+
+float generateOtsu(uint32_t* histogram, uint32_t total) {
+    int sum = 0;
+    for (int i=1;i<256; ++i) sum+= i *histogram[i];
+
+    int sumB = 0;
+    int wB = 0;
+    int wF = 0;
+    int mB = 0;
+    int mF = 0;
+    float max = 0.0f;
+    float between = 0.0f;
+    float threshold1 = 0.0f;
+    float threshold2 = 0.0f;
+
+    for (int i=0;i<256;++i) {
+        wB += histogram[i];
+        if (wB == 0) continue;
+        wF = total - wB;
+        if (wF == 0) break;
+
+        sumB += i * histogram[i];
+
+        mB = sumB / wB;
+        mF = (sum - sumB) /wF;
+
+        between = wB * wF * (mB - mF) * (mB - mF);
+        if (between >= max) {
+            threshold1 = i;
+            if ( between > max ) {
+                threshold2 = i;
+            }
+            max = between;
+        }
+    }
+
+    return (threshold1 + threshold2) / 2.0f;
+}
+
+
+bool** convertToBoolmage(NativeBitmap* nativeBitmap){
+    bool** image = new bool*[nativeBitmap->bitmapInfo.height];
+    NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
+
+    uint32_t nBitmapSize = pBitmap->bitmapInfo.height * pBitmap->bitmapInfo.width;
+    uint32_t* histogram = createHistogram(pBitmap);
+    uint32_t* color_transform = cumulative_equalization(histogram);
+
+    NativeBitmap* gBitmap = transformNativeBitmap(pBitmap, color_transform);
+    delete pBitmap;
+
+    histogram = createHistogram(gBitmap);
+
+    float otsu = generateOtsu(histogram, nBitmapSize);
+
+    //FILE* file = fopen("/sdcard/textTest.txt","w+");
+
+    //stringstream ss;
+
+
+    for (int i=0;i<gBitmap->bitmapInfo.height;i++) {
+        image[i] = new bool[gBitmap->bitmapInfo.width];
+        for (int j=0;j<gBitmap->bitmapInfo.width;j++) {
+            ARGB warna;
+            convertIntToArgb(gBitmap->pixels[i * gBitmap->bitmapInfo.width + j], &warna);
+
+            image[i][j] = (warna.red > otsu);
+
+
+            //if (warna.red > otsu)
+            //    ss << "image[" << i << "][" << j << "] = true;\n"; //LOGD("image[%d][%d] = true;", i, j);
+            //else
+            //    ss << "image[" << i << "][" << j << "] = false;\n"; //LOGD("image[%d][%d] = false;", i, j);
+
+            //fputs(ss.str().c_str(), file);
+            //ss.str(string());
+        }
+    }
+    //fclose(file);
+
+    for (int i=0;i<gBitmap->bitmapInfo.width;i++) {
+        image[0][i] = false;
+        image[gBitmap->bitmapInfo.height-1][i] = false;
+    }
+
+    for (int i=0;i<gBitmap->bitmapInfo.height;i++) {
+        image[i][0] = false;
+        image[i][gBitmap->bitmapInfo.width-1] = false;
+    }
+
+    delete gBitmap;
+
+    return image;
 }
