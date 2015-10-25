@@ -2,23 +2,64 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.ganesus.numbervision" >
 
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.camera.autofocus" />
 
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >
-
         <activity
-            android:name=".MainActivity"
-            android:label="@string/app_name" >
+            android:name=".VisionActivity"
+            android:label="@string/app_name"
+            android:screenOrientation="portrait" >
+        </activity>
+        <activity
+            android:name=".Selector"
+            android:label="NUMBER VISION SELECTOR"
+            android:screenOrientation="portrait" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+        <activity
+            android:name=".DetectWarnaActivity"
+            android:label="@string/title_activity_detect_warna" >
+        </activity>
+        <activity
+            android:name=".EqualigramSelector"
+            android:label="@string/title_activity_equaligram_selector" >
+        </activity>
+        <activity
+            android:name=".EqualigramMain"
+            android:label="@string/title_activity_equaligram_main" >
+        </activity>
+        <activity
+            android:name=".Vision1"
+            android:label="@string/title_activity_vision1" >
+        </activity>
+        <activity
+            android:name=".Vision2"
+            android:label="@string/title_activity_vision2" >
+        </activity>
+        <activity
+            android:name=".Vision3"
+            android:label="@string/title_activity_vision3" >
+        </activity>
+        <activity
+            android:name=".Vision4"
+            android:label="@string/title_activity_vision4" >
+        </activity>
+        <activity
+            android:name=".Vision5"
+            android:label="@string/title_activity_vision5" >
         </activity>
     </application>
 

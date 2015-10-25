@@ -1,1056 +1,355 @@
-// EQUALIGRAM - EQUALIZER INSTAGRAM
-// Andre Susanto, M Yafi, Ramandika P, Kevin Yudi
-// Pengcit - IF ITB
+#include "fungsi.h"
+#include "ekualisasi.h"
+#include "vision.h"
+#include "turncode.h"
 
-#include <jni.h>
-#include <android/log.h>
-#include <stdio.h>
-#include <android/bitmap.h>
-#include <string>
-#include <unistd.h>
-#include <cmath>
-#include <stdlib.h>
-#include <algorithm>
-#include <math.h>
-#include <queue>
-#include <sstream>
-#include <fstream>
-#include <unistd.h>
 
-#define  LOG_TAG    "NUMBER VISION"
-#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
-#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
-
-#define STABILIZATION_FACTOR 4 // faktor untuk stabilisasi (copot noise dari chain code)
-#define NOT_SPECIFIED_COLOR -1
-#define TRESHOLD_ERROR 70
-#define CHUNK_BAR 5 //mxn ke 5x5
-#define TRESHOLD_BLACK 0.5 //minimum value to be perceived as black
-
-#define E '0'
-#define S '2'
-#define W '4'
-#define N '6'
-#define RIGHT 'R'
-#define LEFT 'L'
-
-//subchain code data yang diambil
-#define LENGTH_TAKE 20
-//derajat minimal agar dia dikatakan belok
-#define MIN_D 50.0
-//derajat maximal agar dia dikatakan belok
-#define MAX_D 90.0
-//maximal banyak kode belok
-#define MAX_TURN_CODE 50
-
-// supaya bisa dipanggil sama java
 extern "C"
 {
-    JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path);
-    JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas);
-    JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectMerek (JNIEnv * env, jobject obj, jobject bitmap);
+	// ekualigram
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_loadBitmap (JNIEnv * env, jobject obj, jobject bitmap);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_genHistogram (JNIEnv * env, jobject obj, jobject bitmem, jobject canvas, bool isGrayScale);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_createGrayscale (JNIEnv * env, jobject obj, jobject bitmem);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_createGrayscaleBmp (JNIEnv * env, jobject obj, jobject bitmem);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgo1 (JNIEnv * env, jobject obj, jobject bitmem);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgo1Bmp (JNIEnv * env, jobject obj, jobject bitmem);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgo2 (JNIEnv * env, jobject obj, jobject bitmem);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgo2Bmp (JNIEnv * env, jobject obj, jobject bitmem);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgoLinear (JNIEnv * env, jobject obj, jobject bitmem,int new_min,int new_max);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgoLinearBmp (JNIEnv * env, jobject obj, jobject bitmem,int new_min,int new_max);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgoStep (JNIEnv * env, jobject obj, jobject bitmem, int L);
+	JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgoStepBmp (JNIEnv * env, jobject obj, jobject bitmem, int L);
+
+	// vision 1
+	JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision1_detectAll (JNIEnv * env, jobject obj, jobject bitmap);
+
+	// vision 2
+	JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision2_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path);
+    JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_Vision2_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas);
+
+	// vision 3
+	JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision3_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path);
+    JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_Vision3_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas);
+    JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision3_detectMerek (JNIEnv * env, jobject obj, jobject bitmap);
+
 }
 
 
-using namespace std;
+/////////////////////////////////////////////// BAGIAN EQUALIGRAM ////////////////////////////////////////////////////////
+
 
 /////////////////////////////////////////////////////////////////////////////////////
-// helper class and functions
+// fungsi untuk load bitmap dan store ke native memory
 /////////////////////////////////////////////////////////////////////////////////////
-typedef struct{
-    char value;
-    string chain; // untuk keperluan learning... mager :D
-    int start;
-} DetectedChar;
 
-struct Train {
-    char label;
-    string path;
-    Train(char label,string path){
-        this->label = label;
-        this->path = path;
-    }
-};
-
-typedef struct{
-    char direction;
-    int value;
-} ECode;
-
-typedef struct{
-    char meaning;
-    string data;
-} Knowledge;
-
-typedef struct point{
-    int x;
-    int y;
-
-    point() : x(0) , y(0) {}
-    point(int x,int y) : x(x), y(y) {}
-} Point;
-
-
-typedef struct border_info{
-    Point start_point;
-    vector<int> chain_codes;
-}BorderInfo;
-
-class NativeBitmap{
-public:
-    uint32_t* pixels;
-    AndroidBitmapInfo bitmapInfo;
-
-    NativeBitmap(){
-        pixels = NULL;
-    }
-
-    NativeBitmap(NativeBitmap* nBitmap){
-        this->bitmapInfo = nBitmap->bitmapInfo;
-        uint32_t pixelsCount = this->bitmapInfo.height * this->bitmapInfo.width;
-
-        this->pixels = new uint32_t[pixelsCount];
-        memcpy(this->pixels, nBitmap->pixels, sizeof(uint32_t) * pixelsCount);
-    }
-};
-
-
-typedef struct{
-    uint8_t alpha, red, green, blue;
-} ARGB;
-
-uint32_t convertArgbToInt(ARGB argb) {
-    return (argb.alpha << 24) | (argb.red) | (argb.green << 8) | (argb.blue << 16);
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_loadBitmap (JNIEnv * env, jobject obj, jobject bitmap){
+    return env->NewDirectByteBuffer(convertBitmapToNative (env, bitmap), 0);
 }
 
-void convertIntToArgb(uint32_t pixel, ARGB* argb){
-    argb->red = ((pixel) & 0xff);
-    argb->green = ((pixel >> 8) & 0xff);
-    argb->blue = ((pixel >> 16) & 0xff);
-    argb->alpha = ((pixel >> 24) & 0xff);
-}
+/////////////////////////////////////////////////////////////////////////////////////
+// fungsi untuk generate histogram 3 warna
+/////////////////////////////////////////////////////////////////////////////////////
 
-NativeBitmap* grayscaleBitmap(NativeBitmap* source){
-    NativeBitmap* result = new NativeBitmap(source);
-    uint32_t nBitmapSize = source->bitmapInfo.height * source->bitmapInfo.width;
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_genHistogram (JNIEnv * env, jobject obj, jobject bitmem, jobject canvas, bool isGrayScale){
+	NativeBitmap* nCanvas = convertBitmapToNative(env, canvas);
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
 
 
-    for (uint32_t i = 0; i < nBitmapSize; i++){
-        ARGB bitmapColor;
-        convertIntToArgb(source->pixels[i], &bitmapColor);
+	if (nBitmap->pixels == NULL || nCanvas->pixels == NULL)
+		return NULL;
 
-        uint8_t grayscaleColor = (int)(0.2989f * bitmapColor.red + 0.5870f * bitmapColor.green + 0.1141 * bitmapColor.blue);
+	uint32_t* hRed = new uint32_t[256];
+	uint32_t* hGreen = new uint32_t[256];
+	uint32_t* hBlue = new uint32_t[256];
 
-        bitmapColor.red = grayscaleColor;
-        bitmapColor.green = grayscaleColor;
-        bitmapColor.blue = grayscaleColor;
+	for (uint16_t i = 0; i < 256; i++){
+		hRed[i] = 0; hGreen[i] = 0; hBlue[i] = 0;
+	}
 
-        result->pixels[i] = convertArgbToInt(bitmapColor);
-    }
 
-    return result;
-}
+	uint32_t nBitmapSize = nBitmap->bitmapInfo.height * nBitmap->bitmapInfo.width;
 
-NativeBitmap* convertBitmapToNative(JNIEnv * env, jobject bitmap){
-    AndroidBitmapInfo bitmapInfo;
-    uint32_t* storedBitmapPixels = NULL;
+	for (uint32_t i = 0; i < nBitmapSize; i++){
+		ARGB bitmapColor;
+		convertIntToArgb(nBitmap->pixels[i], &bitmapColor);
 
-    int ret;
-    if ((ret = AndroidBitmap_getInfo(env, bitmap, &bitmapInfo)) < 0){
-        LOGE("Error eksekusi AndroidBitmap_getInfo()! error=%d", ret);
-        return NULL;
-    }
+		hRed[bitmapColor.red]++;
+		hGreen[bitmapColor.green]++;
+		hBlue[bitmapColor.blue]++;
+	}
 
-    LOGD("width:%d height:%d stride:%d", bitmapInfo.width, bitmapInfo.height, bitmapInfo.stride);
+	float scalingBlue = 0.0f, scalingGreen = 0.0f, scalingRed = 0.0f;
+	uint32_t blue_max = hBlue[0], green_max = hGreen[0], red_max = hRed[0];
 
-    if (bitmapInfo.format != ANDROID_BITMAP_FORMAT_RGBA_8888){
-        LOGE("Format bitmap bukan RGBA_8888!");
-        return NULL;
-    }
 
-    void* bitmapPixels;
-    if ((ret = AndroidBitmap_lockPixels(env, bitmap, &bitmapPixels)) < 0){
-        LOGE("Error eksekusi AndroidBitmap_lockPixels()! error=%d", ret);
-        return NULL;
-    }
+	for (uint16_t i = 0; i < 256; i++){
+		if (hBlue[i] > blue_max) blue_max = hBlue[i];
+		if (hGreen[i] > green_max) green_max = hGreen[i];
+        if (hRed[i] > red_max) red_max = hRed[i];
+	}
 
-    uint32_t* src = (uint32_t*) bitmapPixels;
-    storedBitmapPixels = new uint32_t[bitmapInfo.height * bitmapInfo.width];
-    uint32_t pixelsCount = bitmapInfo.height * bitmapInfo.width;
-    memcpy(storedBitmapPixels, src, sizeof(uint32_t) * pixelsCount);
-    AndroidBitmap_unlockPixels(env, bitmap);
+	scalingBlue = 255.0f / blue_max; scalingGreen = 255.0f / green_max; scalingRed = 255.0f / red_max;
 
-    // store ke memory sbg array int
-    NativeBitmap *nBitmap = new NativeBitmap();
-    nBitmap->bitmapInfo = bitmapInfo;
-    nBitmap->pixels = storedBitmapPixels;
-    return nBitmap;
-}
+	ARGB aRed, aGreen, aBlue, aGray;
+	aRed.red = 255; aRed.green = 0; aRed.blue = 0; aRed.alpha = 255;
+	aGreen.red = 0; aGreen.green = 255; aGreen.blue = 0; aGreen.alpha = 255;
+	aBlue.red = 0; aBlue.green = 0; aBlue.blue = 255; aBlue.alpha = 255;
+	aGray.red = 127; aGray.green = 127; aGray.blue = 127; aGray.alpha = 255;
 
-jobject convertNativeToBitmap(JNIEnv * env, NativeBitmap* nBitmap){
-    if (nBitmap->pixels == NULL){
-        LOGD("Bitmap kosong / error");
-        return NULL;
-    }
+	uint32_t iRed= convertArgbToInt(aRed);
+	uint32_t iGreen= convertArgbToInt(aGreen);
+	uint32_t iBlue= convertArgbToInt(aBlue);
+	uint32_t iGray= convertArgbToInt(aGray);
 
-    // manggil fungsi bitmap java via env
-    jclass bitmapCls = env->FindClass("android/graphics/Bitmap");
-    jmethodID createBitmapFunction = env->GetStaticMethodID(bitmapCls, "createBitmap", "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
-    jstring configName = env->NewStringUTF("ARGB_8888");
-    jclass bitmapConfigClass = env->FindClass("android/graphics/Bitmap$Config");
-    jmethodID valueOfBitmapConfigFunction = env->GetStaticMethodID(bitmapConfigClass, "valueOf","(Ljava/lang/String;)Landroid/graphics/Bitmap$Config;");
-    jobject bitmapConfig = env->CallStaticObjectMethod(bitmapConfigClass, valueOfBitmapConfigFunction, configName);
-    jobject newBitmap = env->CallStaticObjectMethod(bitmapCls, createBitmapFunction, nBitmap->bitmapInfo.width, nBitmap->bitmapInfo.height, bitmapConfig);
+	if (isGrayScale){
+		for (uint16_t i = 0; i < 256; i++){
+			int barSize = (int) (hRed[i] * scalingRed);
+			for (int j = 0; j < barSize; j++){
+				nCanvas->pixels[i * 2 + (300 - j) * nCanvas->bitmapInfo.width] = iGray;
+				nCanvas->pixels[i * 2 + 1 + (300 - j) * nCanvas->bitmapInfo.width] = iGray;
+			}
+		}
+	}else{
+		for (uint16_t i = 0; i < 256; i++){
+			int barSize = (int) (hRed[i] * scalingRed);
+			for (int j = 0; j < barSize; j++){
+				nCanvas->pixels[i + (300 - j) * nCanvas->bitmapInfo.width] = iRed;
+			}
 
-    // masukin pixel ke bitmap
-    int ret;
-    void* bitmapPixels;
+			barSize = (int) (hGreen[i] * scalingGreen);
+			for (int j = 0; j < barSize; j++){
+				nCanvas->pixels[260 + i + (300 - j) * nCanvas->bitmapInfo.width] = iGreen;
+			}
 
-    if ((ret = AndroidBitmap_lockPixels(env, newBitmap, &bitmapPixels)) < 0){
-        LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
-        return NULL;
-    }
-
-    uint32_t* newBitmapPixels = (uint32_t*) bitmapPixels;
-    uint32_t pixelsCount = nBitmap->bitmapInfo.height * nBitmap->bitmapInfo.width;
-    memcpy(newBitmapPixels, nBitmap->pixels, sizeof(uint32_t) * pixelsCount);
-    AndroidBitmap_unlockPixels(env, newBitmap);
-
-    //LOGD("convert berhasil");
-    return newBitmap;
+			barSize = (int) (hBlue[i] * scalingBlue);
+			for (int j = 0; j < barSize; j++){
+				nCanvas->pixels[520 + i + (300 - j) * nCanvas->bitmapInfo.width] = iBlue;
+			}
+		}
+	}
+	
+	delete[] hRed;
+	delete[] hBlue;
+	delete[] hGreen;
+	//return convertNativeToBitmap(env, grayscaleBitmap(nBitmap));
+	return convertNativeToBitmap(env, nCanvas);
 
 }
 
-jobjectArray createJavaArray(JNIEnv *env, jsize count, std::string elements[]){
-    jclass stringClass = env->FindClass("java/lang/String");
-    jobjectArray row = env->NewObjectArray(count, stringClass, env->NewStringUTF(""));
-    jsize i;
+/////////////////////////////////////////////////////////////////////////////////////
+// fungsi untuk generate grayscale bitmap
+/////////////////////////////////////////////////////////////////////////////////////
 
-    for (i = 0; i < count; i++) {
-        env->SetObjectArrayElement( row, i, env->NewStringUTF(elements[i].c_str()));
-    }
-    return row;
-}
-
-bool operator==(const Point& lhs, const Point& rhs)
-{
-    return (lhs.x == rhs.x) && (lhs.y == rhs.y);
-}
-
-Point operator+(const Point& lhs, const Point& rhs)
-{
-    return Point(lhs.x + rhs.x , lhs.y + rhs.y);
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_createGrayscaleBmp (JNIEnv * env, jobject obj, jobject bitmem){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
+	return convertNativeToBitmap(env, grayscaleBitmap(nBitmap));
 }
 
 
-Point get_next_traverse_point(Point current_black,Point current_traverse_point) {
-    Point next = current_traverse_point;
-    if (current_traverse_point.x == current_black.x-1 &&
-        current_traverse_point.y == current_black.y+1) {
-        next.y -= 1;
-    } else if (current_traverse_point.x == current_black.x-1 &&
-               current_traverse_point.y == current_black.y) {
-        next.y -= 1;
-    } else if (current_traverse_point.x == current_black.x-1 &&
-               current_traverse_point.y == current_black.y-1) {
-        next.x += 1;
-    } else if (current_traverse_point.x == current_black.x &&
-               current_traverse_point.y == current_black.y-1) {
-        next.x += 1;
-    } else if (current_traverse_point.x == current_black.x + 1 &&
-               current_traverse_point.y == current_black.y-1) {
-        next.y += 1;
-    } else if (current_traverse_point.x == current_black.x + 1 &&
-               current_traverse_point.y == current_black.y) {
-        next.y += 1;
-    } else if (current_traverse_point.x == current_black.x + 1 &&
-               current_traverse_point.y == current_black.y + 1) {
-        next.x -= 1;
-    } else if (current_traverse_point.x == current_black.x &&
-               current_traverse_point.y == current_black.y + 1) {
-        next.x -= 1;
-    }
-    return next;
+/////////////////////////////////////////////////////////////////////////////////////
+// fungsi untuk generate grayscale native bitmap
+/////////////////////////////////////////////////////////////////////////////////////
+
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_createGrayscale (JNIEnv * env, jobject obj, jobject bitmem){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
+	return env->NewDirectByteBuffer(grayscaleBitmap(nBitmap), 0);
 }
 
-int get_chain_code(Point current_black,Point prev_black) {
-    int chain_code = 0;
-    if (prev_black.x == current_black.x-1 &&
-        prev_black.y == current_black.y+1) {
-        chain_code = 7;
-    } else if (prev_black.x == current_black.x-1 &&
-               prev_black.y == current_black.y) {
-        chain_code = 0;
-    } else if (prev_black.x == current_black.x-1 &&
-               prev_black.y == current_black.y-1) {
-        chain_code = 1;
-    } else if (prev_black.x == current_black.x &&
-               prev_black.y == current_black.y-1) {
-        chain_code = 2;
-    } else if (prev_black.x == current_black.x + 1 &&
-               prev_black.y == current_black.y-1) {
-        chain_code = 3;
-    } else if (prev_black.x == current_black.x + 1 &&
-               prev_black.y == current_black.y) {
-        chain_code = 4;
-    } else if (prev_black.x == current_black.x + 1 &&
-               prev_black.y == current_black.y + 1) {
-        chain_code = 5;
-    } else if (prev_black.x == current_black.x &&
-               prev_black.y == current_black.y + 1) {
-        chain_code = 6;
-    }
-    return chain_code;
+/////////////////////////////////////////////////////////////////////////////////////
+// fungsi untuk menerapkan algoritma 1 ke native bitmap grayscale
+/////////////////////////////////////////////////////////////////////////////////////
+
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgo1 (JNIEnv * env, jobject obj, jobject bitmem){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
+
+	uint32_t* histogram = createHistogram(nBitmap);
+	//uint32_t* color_transform = simple_equalization(histogram);
+	uint32_t* color_transform = cumulative_equalization(histogram);
+
+	delete[] histogram;
+	return env->NewDirectByteBuffer(transformNativeBitmap(nBitmap, color_transform), 0);
 }
 
-void erase_image(Point start_point,
-                 bool **image,int length,int height) {
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgo1Bmp (JNIEnv * env, jobject obj, jobject bitmem){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
 
-    Point direction[8] = {Point(1,0), Point(1,1), Point(0,1), Point(-1,1),
-                          Point(-1,0), Point(-1,-1), Point(0,-1), Point(1,-1)};
+	uint32_t* histogram = createHistogram(nBitmap);
+	//uint32_t* color_transform = simple_equalization(histogram);
+	uint32_t* color_transform = cumulative_equalization(histogram);
 
-    queue<Point> bfs_queue;
-    bfs_queue.push(start_point);
-    image[start_point.y][start_point.x] = 0;
-
-    while(!bfs_queue.empty()) {
-        Point front = bfs_queue.front();
-        bfs_queue.pop();
-
-        for (int i=0;i<8;i++) {
-            Point current_point = front + direction[i];
-            if (current_point.x >=0 && current_point.x <= length && current_point.y >= 0 && current_point.y <= height &&
-                image[current_point.y][current_point.x]) {
-                image[current_point.y][current_point.x] = 0;
-                bfs_queue.push(current_point);
-            }
-        }
-    }
+	delete[] histogram;
+	return convertNativeToBitmap(env, transformNativeBitmap(nBitmap, color_transform));
 }
 
-bool is_point(Point point,bool **image) {
+/////////////////////////////////////////////////////////////////////////////////////
+// fungsi untuk menerapkan algoritma 2 ke native bitmap grayscale
+/////////////////////////////////////////////////////////////////////////////////////
 
-    int x = point.x;
-    int y = point.y;
 
-    return image[y][x] && !image[y-1][x] && !image[y][x-1] && !image[y+1][x] && !image[y][x+1];
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgo2 (JNIEnv * env, jobject obj, jobject bitmem){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
+
+	uint32_t* histogram = createHistogram(nBitmap);
+	uint32_t* color_transform = simple_equalization(histogram);
+
+	delete[] histogram;
+	return env->NewDirectByteBuffer(transformNativeBitmap(nBitmap, color_transform), 0);
 }
 
-vector<int> get_chain_codes(Point start_point,
-                            bool **image,int length,int height) {
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgo2Bmp (JNIEnv * env, jobject obj, jobject bitmem){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
 
-    vector<int> chain_codes;
+	uint32_t* histogram = createHistogram(nBitmap);
+	uint32_t* color_transform = simple_equalization(histogram);
 
-    if (is_point(start_point,image)) return chain_codes;
-
-    Point current_black = start_point;
-    Point current_white = current_black;
-    current_white.x -= 1;
-
-    Point black0 = current_black;
-    Point black1;
-
-    bool has_first_found = false;
-
-    Point traverse_point = current_white;
-    Point traverse_point_prev = current_white;
-    while (true) {
-
-        traverse_point_prev = traverse_point;
-        traverse_point = get_next_traverse_point(current_black, traverse_point);
-        if (has_first_found && current_black == black0 && black1 == traverse_point) {
-            break;
-        }
-        if (image[traverse_point.y][traverse_point.x]) {
-            int chain_code = get_chain_code(traverse_point,current_black);
-
-            if (!has_first_found) {
-                black1 = traverse_point;
-                has_first_found = true;
-            }
-
-            chain_codes.push_back(chain_code);
-            current_black = traverse_point;
-            current_white = traverse_point_prev;
-            traverse_point = current_white;
-
-        }
-    }
-    return chain_codes;
-}
-
-Point get_start_point(bool **image, int length,int height) {
-    for (int i=0;i<height;i++) {
-        for (int j=0;j<length;j++) {
-            if (image[i][j]) return Point(j,i);
-        }
-    }
-    return Point(-1,-1);
-}
-
-vector<BorderInfo> get_border_infos(bool **image,int length,int height) {
-    vector<BorderInfo> border_infos;
-    while(true) {
-        Point start_point = get_start_point(image, length, height);
-        if (start_point.x == -1 && start_point.y == -1) {
-            break;
-        }
-        BorderInfo border_info;
-        border_info.start_point = start_point;
-        border_info.chain_codes = get_chain_codes(start_point, image, length, height);
-
-        border_infos.push_back(border_info);
-        erase_image(start_point,image,length,height);
-    }
-    return border_infos;
-}
-
-float generateOtsu(uint32_t* histogram, uint32_t total) {
-    int sum = 0;
-    for (int i=1;i<256; ++i) sum+= i *histogram[i];
-
-    int sumB = 0;
-    int wB = 0;
-    int wF = 0;
-    int mB = 0;
-    int mF = 0;
-    float max = 0.0f;
-    float between = 0.0f;
-    float threshold1 = 0.0f;
-    float threshold2 = 0.0f;
-
-    for (int i=0;i<256;++i) {
-        wB += histogram[i];
-        if (wB == 0) continue;
-        wF = total - wB;
-        if (wF == 0) break;
-
-        sumB += i * histogram[i];
-
-        mB = sumB / wB;
-        mF = (sum - sumB) /wF;
-
-        between = wB * wF * (mB - mF) * (mB - mF);
-        if (between >= max) {
-            threshold1 = i;
-            if ( between > max ) {
-                threshold2 = i;
-            }
-            max = between;
-        }
-    }
-
-    return (threshold1 + threshold2) / 2.0f;
+	delete[] histogram;
+	return convertNativeToBitmap(env, transformNativeBitmap(nBitmap, color_transform));
 }
 
 
-uint32_t* get_cumulative_histogram(uint32_t* histogram) {
+/////////////////////////////////////////////////////////////////////////////////////
+// fungsi untuk menerapkan algoritma linear ke native bitmap grayscale
+/////////////////////////////////////////////////////////////////////////////////////
 
-    uint32_t* cumulative_histogram = new uint32_t[256];
 
-    int accumulation = 0;
-    for (int i=0; i<256; i++) {
-        accumulation += histogram[i];
-        cumulative_histogram[i] = accumulation;
-    }
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgoLinear (JNIEnv * env, jobject obj, jobject bitmem,int new_min,int new_max){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
 
-    return cumulative_histogram;
+	uint32_t* color_transform = new uint32_t[256];
+	uint32_t* histogram = createHistogram(nBitmap);
+	int old_min = get_lower_bound(histogram);
+	int old_max = get_upper_bound(histogram);
+
+	for(int i = 0; i < 256; i++){
+		color_transform[i] = NOT_SPECIFIED_COLOR;
+		if (old_min <= i && i <= old_max){
+			color_transform[i] = adjustIntensity(i,old_min,old_max,new_min,new_max);
+		}
+	}
+	return env->NewDirectByteBuffer(transformNativeBitmap(nBitmap,color_transform),0);
 }
 
-int get_lower_bound(uint32_t* histogram) {
-    for (int i=0;i<256;i++) {
-        if (histogram[i] !=0) {
-            return i;
-        }
-    }
-    return NOT_SPECIFIED_COLOR;
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgoLinearBmp (JNIEnv * env, jobject obj, jobject bitmem,int new_min,int new_max){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
+
+	uint32_t* color_transform = new uint32_t[256];
+	uint32_t* histogram = createHistogram(nBitmap);
+	int old_min = get_lower_bound(histogram);
+	int old_max = get_upper_bound(histogram);
+
+	for(int i = 0; i < 256; i++){
+		color_transform[i] = NOT_SPECIFIED_COLOR;
+		if (old_min <= i && i <= old_max){
+			color_transform[i] = adjustIntensity(i,old_min,old_max,new_min,new_max);
+		}
+	}
+
+	return convertNativeToBitmap(env,transformNativeBitmap(nBitmap,color_transform));
 }
 
-int get_upper_bound(uint32_t* histogram) {
-    for (int i= 255; i>=0; i--) {
-        if (histogram[i] !=0) {
-            return i;
-        }
-    }
+/////////////////////////////////////////////////////////////////////////////////////
+// fungsi untuk menerapkan algoritma step ke native bitmap grayscale
+/////////////////////////////////////////////////////////////////////////////////////
 
-    return NOT_SPECIFIED_COLOR;
+
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgoStep (JNIEnv * env, jobject obj, jobject bitmem, int L){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
+
+	uint32_t* histogram = createHistogram(nBitmap);
+	uint32_t* color_transform = equalize_step(histogram, L);
+
+	delete[] histogram;
+	return env->NewDirectByteBuffer(transformNativeBitmap(nBitmap, color_transform), 0);
 }
 
-uint32_t* cumulative_equalization(uint32_t* histogram) {
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_EqualigramMain_applyAlgoStepBmp (JNIEnv * env, jobject obj, jobject bitmem, int L){
+	NativeBitmap* nBitmap = (NativeBitmap*) env->GetDirectBufferAddress(bitmem);
 
-    uint32_t* color_transform = new uint32_t[256];
-    uint32_t* cumulative_histogram = get_cumulative_histogram(histogram);
+	uint32_t* histogram = createHistogram(nBitmap);
+	uint32_t* color_transform = equalize_step(histogram, L);
 
-    int lower_bound = get_lower_bound(histogram);
-    int upper_bound = get_upper_bound(histogram);
-
-    for (int i=0; i<256; i++) {
-        color_transform[i] = NOT_SPECIFIED_COLOR;
-    }
-
-    int total_pixels = cumulative_histogram[upper_bound];
-    int denominator = total_pixels - cumulative_histogram[lower_bound];
-    for (int i=lower_bound;i<=upper_bound;i++) {
-        if (histogram[i])
-            color_transform[i] = ((cumulative_histogram[i] - cumulative_histogram[lower_bound]) *
-                                  (254) / denominator) + 1;
-    }
-
-    return color_transform;
-}
-
-NativeBitmap* transformNativeBitmap(NativeBitmap* source, uint32_t* transform){
-    NativeBitmap* result = new NativeBitmap(source);
-    uint32_t nBitmapSize = source->bitmapInfo.height * source->bitmapInfo.width;
-
-
-    for (uint32_t i = 0; i < nBitmapSize; i++){
-        ARGB bitmapColor;
-        convertIntToArgb(source->pixels[i], &bitmapColor);
-
-        bitmapColor.red = transform[bitmapColor.red];
-        bitmapColor.green = transform[bitmapColor.green];
-        bitmapColor.blue = transform[bitmapColor.blue];
-
-        result->pixels[i] = convertArgbToInt(bitmapColor);
-    }
-
-    delete[] transform;
-    return result;
+	delete[] histogram;
+	return convertNativeToBitmap(env,transformNativeBitmap(nBitmap,color_transform));
 }
 
 
-//////////////////////////////////////////////////////////////////////////////////////
-/// ALGORITMA BELOK BELOK
-//////////////////////////////////////////////////////////////////////////////////////
-
-double degree_by_vote(const string &test){
-    double dx[] = { 1, 1, 0,-1,-1,-1, 0, 1};
-    double dy[] = { 0,-1,-1,-1, 0, 1, 1, 1};
-
-    double x = 0;
-    double y = 0;
-    for(int i = 0; i < (int) test.size(); i++){
-        int _dir = (int) (test[i] - '0');
-        x += dx[_dir];
-        y += dy[_dir];
-        //printf("%c %.3lf\n",test[i],deg);
-    }
-    double temp = atan2 (-y,x) * 180 / 3.14159265;
-    temp += 360.;
-    if (temp > 360.0) temp -= 360.0;
-    return temp;
-}
 
 
-bool is_right_turn(double s,double d){
-    double diff = fabs(s - d);
-    if (diff > 180.0) diff = 360.0 - diff;
-    if (diff < MIN_D || diff > MAX_D) return false;
-
-    s = s + diff;
-    if (s > 360.0) s -= 360.0;
-    return fabs(s - d) <= 0.0001;
-}
-
-bool is_left_turn(double s,double d){
-    double diff = fabs(s - d);
-    if (diff > 180.0) diff = 360.0 - diff;
-    if (diff < MIN_D || diff > MAX_D) return false;
-
-    d = d + diff;
-    if (d > 360.0) d -= 360.0;
-    return fabs(s - d) <= 0.0001;
-}
-
-bool is_u_turn_cw(double s,double d){
-    double diff = fabs(s - d);
-    if (diff > 180.0) diff = 360.0 - diff;
-    if (diff < 150.0) return false;
-
-    s = s + diff;
-    if (s > 360.0) s -= 360.0;
-    return fabs(s - d) <= 0.0001;
-}
-
-bool is_u_turn_ccw(double s,double d){
-    double diff = fabs(s - d);
-    if (diff > 180.0) diff = 360.0 - diff;
-    if (diff < 150.0) return false;
-
-    d = d + diff;
-    if (d > 360.0) d -= 360.0;
-    return fabs(s - d) <= 0.0001;
-}
-
-string generate_turn(const string &code){
-    LOGD("generate turn");
-    string ret;
-    for(int i = 0; i + LENGTH_TAKE < (int) code.size(); ){
-        string sleft = code.substr(i,LENGTH_TAKE/2);
-        string sright = code.substr(i + (LENGTH_TAKE/2),LENGTH_TAKE/2);
-        double dl = degree_by_vote(sleft);
-        double dr = degree_by_vote(sright);
-        double diff = fabs(dl - dr);
-        if (diff > 180.0) diff = 360. - diff;
-        if (is_left_turn(dl,dr)){
-            ret += LEFT;
-            i += LENGTH_TAKE/2;
-            printf("got left turn at %d, %s %s, deg = %.3lf %.3lf %.3lf\n",i,sleft.c_str(),sright.c_str(),dl,dr,diff);
-        } else if (is_right_turn(dl,dr)){
-            ret += RIGHT;
-            i += LENGTH_TAKE/2;
-            printf("got right turn at %d, %s %s , deg = %.3lf %.3lf %.3lf\n",i,sleft.c_str(),sright.c_str(),dl,dr,diff);
-        } else if (is_u_turn_cw(dl,dr)){
-            ret += RIGHT; ret += RIGHT;
-            i += LENGTH_TAKE /2;
-        } else if (is_u_turn_ccw(dl,dr)) {
-            ret += LEFT; ret += LEFT;
-            i += LENGTH_TAKE /2;
-        } else {
-            i++;
-        }
-    }
-    LOGD("generate turn end");
-    return ret;
-}
 
 
-int edit_distance(const string& a,const string& b){
-    LOGD("edit distance start");
-    int dp[1000][1000];
 
-    for(int ia = 1; ia <= (int) a.size(); ia++){
-        dp[ia][0] = ia;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//		VISION PERTAMA
 
-    }
-    for(int ib = 1; ib <= (int) b.size(); ib++){
-        dp[0][ib] = ib;
-    }
+JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision1_detectAll (JNIEnv * env, jobject obj, jobject bitmap){
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    bool **image;
 
-    for(int ia = 1; ia <= (int) a.size(); ia++){
-        for(int ib = 1; ib <= (int) b.size(); ib++){
-            if (a[ia - 1] == b[ib- 1]){
-                dp[ia][ib] = dp[ia-1][ib-1];
-            } else {
-                //b gak boleh dihapus
-                dp[ia][ib] = min(dp[ia-1][ib],min(dp[ia-1][ib-1],dp[ia][ib-1])) + 1;
-            }
-        }
-    }
-    LOGD("edit distance end");
-    return dp[a.size()][b.size()];
-}
-
-vector<char> predict(const string& chain_code,const vector<Train>& trains){
-    LOGD("predict start");
-    vector<char> probabilities;
-    probabilities.clear();
-
-    int cost = edit_distance(chain_code,trains[0].path);
-    LOGD("predict prob before");
-    probabilities.push_back(trains[0].label);
-    LOGD("predict prob after");
-    for(int i = 1; i < (int) trains.size(); i++){
-        LOGD("%d",i);
-        int cnow = edit_distance(chain_code,trains[i].path);
-        if (cnow < cost){
-            cost = cnow;
-            probabilities.clear();
-            probabilities.push_back(trains[i].label);
-        } else if (cnow == cost){
-            probabilities.push_back(trains[i].label);
-        }
-    }
-    LOGD("predict end");
-    return probabilities;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////
-// ALGORITMA MATCHER
-////////////////////////////////////////////////////////////////////////////////////////
-
-
-vector<ECode> stabileData(string original){
-    vector<ECode> training;
-
-    char currentDirection = original[0];
-    int currentValue = 1;
-    for (int i = 1 ; i < original.size(); i++){
-        if (currentDirection == original[i])
-            currentValue++;
-        else{
-            ECode kode;
-            kode.direction = currentDirection;
-            kode.value = currentValue;
-
-            training.push_back(kode);
-
-            currentValue = 1;
-            currentDirection = original[i];
-        }
-    }
-    ECode kode;
-    kode.direction = currentDirection;
-    kode.value = currentValue;
-    training.push_back(kode);
-
-    // pemotong chain code, kalo ga dipake malah hasilnya lebih bagus :/
-    /*
-    for (int i = 1; i < training.size() - 1; i++){
-        if (training[i - 1].direction == training[i + 1].direction && training[i - 1].value + training[i + 1].value > STABILIZATION_FACTOR && training[i].value == 1){
-            training[i - 1].value = training[i - 1].value + training[i].value + training[i + 1].value;
-            training.erase(training.begin() + i, training.begin() + i + 2);
-            //cout << (i-1) << " After Train : " << training[i - 1].value << endl;
-
-            i--;
-        }
-    }*/
-
-    return training;
-}
-
-uint32_t* createHistogram(NativeBitmap* nBitmap){
-    if (nBitmap->pixels == NULL)
-        return NULL;
-
-    uint32_t* result = new uint32_t[256];
-
-    for (int i=0; i<256; i++)
-        result[i] = 0;
-
-    uint32_t nBitmapSize = nBitmap->bitmapInfo.height * nBitmap->bitmapInfo.width;
-
-    for (uint32_t i = 0; i < nBitmapSize; i++){
-        ARGB bitmapColor;
-        convertIntToArgb(nBitmap->pixels[i], &bitmapColor);
-        result[bitmapColor.red]++;
-    }
-
-    return result;
-}
-
-float calculateChain (string strKnowledge, string strTest ){
-    vector<ECode> knowledge, test;
-    vector<ECode> data1 = stabileData (strKnowledge);
-    vector<ECode> data2 = stabileData(strTest);
-
-    // pilih yang paling besar sebagai basis (mengandung paling banyak error)
-    if (data1.size() > data2.size()){
-        knowledge = data1;
-        test = data2;
-    }else{
-        knowledge = data2;
-        test = data1;
-    }
-
-    int testSize = test.size(), knowledgeSize = knowledge.size();
-    int knowledgeChains = 0, testChains = 0;
-
-    for (int i = 0 ; i < knowledgeSize; i++)
-        knowledgeChains += knowledge[i].value;
-
-    for (int i = 0 ; i < testSize; i++)
-        testChains += test[i].value;
-
-
-    float currentScore = 0; int iteratorKnowledge = 0;
-
-    for (int i = 0; i < testSize && iteratorKnowledge < knowledgeSize; i++){
-        if (test[i].direction == knowledge[iteratorKnowledge].direction){
-            currentScore += ((float)test[i].value / testChains + (float)knowledge[iteratorKnowledge].value / knowledgeChains) * 2.0f;
-        }else{
-            currentScore -= (float)knowledge[iteratorKnowledge].value / (knowledgeChains * 2.0f);
-            i--;
-        }
-        iteratorKnowledge++;
-
-        if (iteratorKnowledge == knowledgeSize){
-            for (; i < testSize; i++){
-                currentScore -= (float)test[i].value / testChains;
-            }
-        }
-    }
-
-
-    return currentScore;
-}
-
-vector<Knowledge> createKnowledge(const char* path){
-    vector<Knowledge> result;
-    LOGD("Loaded Knowledge File %s", path);
-    ifstream infile(path);
-
-    char tmp_char; string tmp_string;
-    while (infile >> tmp_char >> tmp_string)
-    {
-        Knowledge tmp_knowledge;
-        tmp_knowledge.meaning = tmp_char;
-        tmp_knowledge.data = tmp_string;
-
-        result.push_back(tmp_knowledge);
-        //result.push_back(Train(tmp_char, tmp_string));
-    }
-
-    return result;
-}
-
-char guessChain(string chainCode, vector<Knowledge> knowledge){
-
-
-    char currentChar = knowledge[0].meaning;
-    float currentMax = calculateChain(knowledge[0].data, chainCode);
-    for (int i = 1 ; i < knowledge.size(); i++){
-        float rate = calculateChain(knowledge[i].data, chainCode);
-        if (rate > currentMax){
-            currentMax = rate;
-            currentChar = knowledge[i].meaning;
-        }
-    }
-
-    return currentChar;
-}
-
-bool** convertToBoolmage(NativeBitmap* nativeBitmap){
-    bool** image = new bool*[nativeBitmap->bitmapInfo.height];
-    NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
-
-    uint32_t nBitmapSize = pBitmap->bitmapInfo.height * pBitmap->bitmapInfo.width;
-    uint32_t* histogram = createHistogram(pBitmap);
-    uint32_t* color_transform = cumulative_equalization(histogram);
-
-    NativeBitmap* gBitmap = transformNativeBitmap(pBitmap, color_transform);
-    delete pBitmap;
-
-    histogram = createHistogram(gBitmap);
-
-    float otsu = generateOtsu(histogram, nBitmapSize);
-
-    //FILE* file = fopen("/sdcard/textTest.txt","w+");
-
-    //stringstream ss;
-
-
-    for (int i=0;i<gBitmap->bitmapInfo.height;i++) {
-        image[i] = new bool[gBitmap->bitmapInfo.width];
-        for (int j=0;j<gBitmap->bitmapInfo.width;j++) {
+    image = new bool*[nativeBitmap->bitmapInfo.height];
+    for (int i=0;i<nativeBitmap->bitmapInfo.height;i++) {
+        image[i] = new bool[nativeBitmap->bitmapInfo.width];
+        for (int j=0;j<nativeBitmap->bitmapInfo.width;j++) {
             ARGB warna;
-            convertIntToArgb(gBitmap->pixels[i * gBitmap->bitmapInfo.width + j], &warna);
+            convertIntToArgb(nativeBitmap->pixels[i * nativeBitmap->bitmapInfo.width + j], &warna);
 
-            image[i][j] = (warna.red > otsu);
-
-
-            //if (warna.red > otsu)
-            //    ss << "image[" << i << "][" << j << "] = true;\n"; //LOGD("image[%d][%d] = true;", i, j);
-            //else
-            //    ss << "image[" << i << "][" << j << "] = false;\n"; //LOGD("image[%d][%d] = false;", i, j);
-
-            //fputs(ss.str().c_str(), file);
-            //ss.str(string());
+            image[i][j] = !(warna.blue == 255 && warna.green == 255 && warna.red == 255);
         }
     }
-    //fclose(file);
 
-    for (int i=0;i<gBitmap->bitmapInfo.width;i++) {
-        image[0][i] = false;
-        image[gBitmap->bitmapInfo.height-1][i] = false;
-    }
-
-    for (int i=0;i<gBitmap->bitmapInfo.height;i++) {
-        image[i][0] = false;
-        image[i][gBitmap->bitmapInfo.width-1] = false;
-    }
-
-    delete gBitmap;
-
-    return image;
-}
-
-/*typedef struct border_info{
-    Point start_point;
-    vector<int> chain_codes;
-}BorderInfo;*/
+    vector<DetectedChar> interpretation;
+    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
+    delete nativeBitmap;
 
 
-void write_bool(bool** arr,Point p1,Point p2)
-{
-    for(int i=p1.y;i<=p2.y;i++) {
+    for (int i=0;i<border_infos.size();i++) {
+        BorderInfo border_info = border_infos[i];
         stringstream sskode;
-        for (int j = p1.x; j <= p2.x; j++)
-            sskode << arr[i][j] << " ";
-        LOGD("%s", sskode.str().c_str());
-    }
-}
 
-void write_to_file(vector<int>* arr)
-{
-    stringstream sskode;
-    vector<int>::iterator it;
-    //for(int i=0;i<size;i++)
-    for(it=arr->begin();it!=arr->end();it++)
-        sskode<<(*it)<<" ";
-    LOGD("Smoothing:%s",sskode.str().c_str());
-}
-/**************SMOOTHING + NXN *******************
-************************************************/
-
-
-NativeBitmap* smoothing(NativeBitmap* res){
-    uint32_t width=res->bitmapInfo.width;
-    uint32_t height=res->bitmapInfo.height;
-    uint32_t size=width*height;
-    vector<int> value;
-    vector<int>::iterator it;
-    uint32_t *value_array=res->pixels;
-    for(uint32_t i=0;i<size;i++){
-        int up,bottom,left,right,up_right,up_left,bottom_right,bottom_left;
-        if((i+width)<=(height*width-1)){up=(int)(i+width);value.push_back(up);}else {up=-1;} //up cell
-        if(i>width){bottom=(int)(i-width);value.push_back(bottom);}else{bottom=-1;}
-        if(i%width!=width-1){right=(int)(i+1);value.push_back(right);}else{right=-1;}
-        if(i%width!=0){left=(int)(i-1);value.push_back(left);}else{left=-1;}
-        if(up!=-1 && right!=-1) {up_right=up+1;value.push_back(up_right);}
-        if(up!=-1 && left!=-1) {up_left=up-1;value.push_back(up_left);}
-        if(bottom!=-1 && right!=-1) {bottom_right=bottom+1;value.push_back(bottom_right);}
-        if(bottom!=-1 && left!=-1) {bottom_left=bottom-1;value.push_back(bottom_left);}
-        uint32_t mean=0;
-        for(it=value.begin();it!=value.end();it++){
-            mean+=value_array[(*it)];
+        for (int j=0;j<border_info.chain_codes.size();j++) {
+            sskode << border_info.chain_codes[j];
         }
-        mean=mean/8;
-        value_array[i]=mean;
+
+        DetectedChar detectedChar;
+        detectedChar.start = border_info.start_point.x;
+        detectedChar.value = guessChainV1(sskode.str());
+        interpretation.push_back(detectedChar);
+
+        //ss << guessChainV1(sskode.str());
+        // LOGD("CHAIN CODE: %s", sskode.str().c_str());
+        // LOGD("KIRA KIRA = %d \n", match_chain_code(test,ukuran,numbers, numbers.size()));
+
     }
-    return res;
-}
 
 
-Point chcodeToPoint(Point start,int chcode){
-    switch(chcode) {
-        case 0:
-            return Point(start.x+1,start.y);
-            break;
-        case 1:
-            return Point(start.x+1,start.y+1);
-            break;
-        case 2:
-            return Point(start.x,start.y+1);
-            break;
-        case 3:
-            return Point(start.x-1,start.y+1);
-            break;
-        case 4:
-            return Point(start.x-1,start.y);
-            break;
-        case 5:
-            return Point(start.x-1,start.y-1);
-            break;
-        case 6:
-            return Point(start.x,start.y-1);
-            break;
-        case 7:
-            return Point(start.x+1,start.y-1);
-            break;
-        default:
-            return Point(-1,-1);
-            break;
-    }
-}
+    stringstream ss;
 
-//Single digit to NxN
-bool** singleToNxN(BorderInfo input,bool** image_copy){
-    vector<int> *temp=&(input.chain_codes);
-    vector<int>::iterator it;
-    int up=input.start_point.y,bottom=up,right=input.start_point.x,left=right;
-    Point nextP=input.start_point;
-    //Find rectangle that includes the number
-    for(it=temp->begin();it!=temp->end();it++){
-        nextP=chcodeToPoint(nextP,(*it));
-        if(nextP.x>right) right=nextP.x;
-        else if(nextP.x<left) left=nextP.x;
-        if(nextP.y>up) up=nextP.y;
-        else if(nextP.y<bottom) bottom=nextP.y;
-    }
-    int width=right-left+1;
-    int height=up-bottom+1;
-    bool** array=new bool*[CHUNK_BAR+2];
-    for(int i=0;i<CHUNK_BAR+2;i++)array[i]=new bool[CHUNK_BAR+2];
-    //Init elemen array to 0
-    for(int i=0;i<CHUNK_BAR+2;i++)
-        for(int j=0;j<CHUNK_BAR+2;j++)
-            array[i][j]=false;
-    //mxn to 5x5
-    int row=width/CHUNK_BAR,col=height/CHUNK_BAR;
-    int sum=row*col;
-    for(int j=bottom;j<=up;j+=col){
-        for(int i=left;i<=right;i+=row){
-            //Check majority of black
-            int counter=0;
-            int black=0;
-            LOGD("Ordinat: %d %d || Absis:%d %d",j,j+col-1,i,i+row-1);
-            for (int m = j; m <= j + (col) - 1 && m <= up; m++) {
-                stringstream ss;
-                for(int n=i;n<=i+(row)-1 && n<=right;n++){
-                    if (image_copy[m][n] == true) {ss<<1<<" ";black++;}
-                    else ss<<0<<" ";
-                    counter++;
-                }
-                //LOGD("%s",ss.str().c_str());
-            }
-            //calculate percentage of black
-            if(counter!=0){
-                float percent=(float)black/sum;
-                LOGD("x:%d||y:%d===>percent=%d/%d=%f",(j-bottom)/col,(i-left)/row,black,counter,percent);
-                if(percent>TRESHOLD_BLACK) array[1+(i-left)/row][1+(j-bottom)/col]=true;
+    while(interpretation.size() > 0){
+        int minValue = interpretation[0].start;
+        int currentMin = 0;
+        for (int i = 1; i < interpretation.size(); i++){
+            if (interpretation[i].start < minValue){
+                minValue = interpretation[i].start;
+                currentMin = i;
             }
         }
+        ss << interpretation[currentMin].value;
+        interpretation.erase(interpretation.begin() + currentMin);
     }
-    for(int i=1;i<CHUNK_BAR+2;i++) array[i][CHUNK_BAR+1]=false;
-    for(int j=1;j<CHUNK_BAR+2;j++) array[CHUNK_BAR+1][j]=false;
-    return array;
+
+    // [1] adalah ekspresi input, [2] adalah hasil perhitungan
+    std::string tes[] = { ss.str().c_str(), "44" };
+    jobjectArray hasil2 = createJavaArray(env, 2, tes);
+
+    return hasil2;
 }
 
-//All digit to NxN, output:vector<BorderInfo>
-vector<BorderInfo> toNxN(NativeBitmap* src){
-    LOGD("Ukuran image:%d %d",src->bitmapInfo.width,src->bitmapInfo.height);
-    bool** bool_image=convertToBoolmage(src);
 
-    bool** bool_image_copy=new bool*[src->bitmapInfo.height];
-    vector<BorderInfo> after_transform;
-    vector<BorderInfo>::iterator it;
-    int width=src->bitmapInfo.width,height=src->bitmapInfo.height;
-
-    for(uint32_t i=0;i<height;i++){
-        bool_image_copy[i]=new bool[width];
-    }
-    for(uint32_t i=0;i<height;i++)
-        for(uint32_t j=0;j<width;j++)
-            bool_image_copy[i][j]=bool_image[i][j];
-
-    vector<BorderInfo> borders=get_border_infos(bool_image,width,height);
-
-    vector<BorderInfo> temp;
-
-    for(it=borders.begin();it!=borders.end();it++)
-    {
-        bool** array=singleToNxN(*it,bool_image_copy);
-        LOGD("5x5 mapping");
-        write_bool(array,Point(0,0),Point(6,6));
-        LOGD("FINISH singleToNxN");
-        temp=get_border_infos(array,CHUNK_BAR+2,CHUNK_BAR+2);
-        after_transform.insert(after_transform.end(),temp.begin(),temp.end());
-    }
-    return temp;
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-// VOTING?
-//////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//		VISION KEDUA
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////
 
-JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas){
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_Vision2_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas){
     NativeBitmap* nCanvas = convertBitmapToNative(env, canvas);
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
     NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
@@ -1084,29 +383,120 @@ JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_MainActivity_preProses (
 }
 
 
-JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path){
+JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision2_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path){
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
-    nativeBitmap=smoothing(nativeBitmap);
-    //vector<BorderInfo> MN=toNxN(nativeBitmap);
-    bool **image = convertToBoolmage(nativeBitmap); //nativeBitmap to 0,0
+    bool **image = convertToBoolmage(nativeBitmap);
+    const char* path_knowledge = env->GetStringUTFChars( path , NULL ) ;
+    vector<Knowledge> knowledge = createKnowledge(path_knowledge);
+
+    vector<DetectedChar> interpretation;
+    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
+    delete nativeBitmap;
+
+    //FILE* file = fopen("/sdcard/textTest.txt","w+");
+
+    for (int i=0;i<border_infos.size();i++) {
+        BorderInfo border_info = border_infos[i];
+        stringstream sskode;
+
+        for (int j = 0; j < border_info.chain_codes.size(); j++) {
+            sskode << border_info.chain_codes[j];
+        }
+
+        if (border_info.chain_codes.size() > TRESHOLD_ERROR) {
+            DetectedChar detectedChar;
+            detectedChar.start = border_info.start_point.x;
+            detectedChar.value = guessChain(sskode.str(), knowledge);
+
+            sskode << endl;
+            detectedChar.chain = sskode.str();
+            interpretation.push_back(detectedChar);
+        }
+        //ss << guessChain(sskode.str());
+        //LOGD("CHAIN CODE: %s", sskode.str().c_str());
+
+        //sskode << endl;
+        //fputs(sskode.str().c_str(), file);
+
+    }
+    //fclose(file);
+
+    stringstream ss;
+
+    FILE* file = fopen("/sdcard/textTest.txt","w+");
+
+    while(interpretation.size() > 0){
+        int minValue = interpretation[0].start;
+        int currentMin = 0;
+        for (int i = 1; i < interpretation.size(); i++){
+            if (interpretation[i].start < minValue){
+                minValue = interpretation[i].start;
+                currentMin = i;
+            }
+        }
+        fputs(interpretation[currentMin].chain.c_str(), file);
+        ss << interpretation[currentMin].value;
+        interpretation.erase(interpretation.begin() + currentMin);
+
+    }
+    fclose(file);
+
+    // [1] adalah ekspresi input, [2] adalah hasil perhitungan*/
+    std::string tes[] = { ss.str().c_str(), "44" };
+    //std::string tes[] = { ss.str().c_str(), "44" };
+    jobjectArray hasil2 = createJavaArray(env, 2, tes);
+
+    return hasil2;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//		VISION KETIGA
+
+
+
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_Vision3_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas){
+    NativeBitmap* nCanvas = convertBitmapToNative(env, canvas);
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
+    delete  nativeBitmap;
+
+    uint32_t nBitmapSize = pBitmap->bitmapInfo.height * pBitmap->bitmapInfo.width;
+    uint32_t* histogram = createHistogram(pBitmap);
+    uint32_t* color_transform = cumulative_equalization(histogram);
+
+    NativeBitmap* gBitmap = transformNativeBitmap(pBitmap, color_transform);
+    delete pBitmap;
+    delete histogram;
+    histogram = createHistogram(gBitmap);
+
+    float otsu = generateOtsu(histogram, nBitmapSize);
+
+    ARGB aGray;
+    aGray.red = 127; aGray.green = 127; aGray.blue = 127; aGray.alpha = 255;
+    uint32_t iGray= convertArgbToInt(aGray);
+
+    for (uint32_t i = 0; i < nBitmapSize; i++){
+        ARGB bitmapColor;
+        convertIntToArgb(gBitmap->pixels[i], &bitmapColor);
+
+        if (bitmapColor.red > otsu){
+            nCanvas->pixels[i] = iGray;
+        }
+    }
+
+    return convertNativeToBitmap(env, nCanvas);
+}
+
+
+JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision3_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path){
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    bool **image = convertToBoolmage(nativeBitmap);
     const char* path_knowledge = env->GetStringUTFChars( path , NULL ) ;
     vector<Knowledge> knowledge = createKnowledge(path_knowledge);
     //vector<Train> train = createKnowledge(path_knowledge);
 
     vector<DetectedChar> interpretation;
-    vector<BorderInfo> border_infos = toNxN(nativeBitmap);//get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
-/*
-    LOGD("Size borderinfo:%d",border_infos.size());
-    vector<BorderInfo>::iterator it;
-    for(it=border_infos.begin();it!=border_infos.end();it++){
-        vector<int> temp=it->chain_codes;
-        vector<int>::iterator it;
-        stringstream stream;
-        for(it=temp.begin();it!=temp.end();it++){
-            stream<<(*it);
-        }
-        LOGD("kd belok:%s",stream.str().c_str());
-    }*/
+    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
     delete nativeBitmap;
 
     stringstream list_kode_belok;
@@ -1177,17 +567,17 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     //std::string tes[] = { ss.str().c_str(), "44" };
     jobjectArray hasil2 = createJavaArray(env, 2, tes);
 
+	LOGD("DETECT PLAT COMPLETE!");
+	
     return hasil2;
 }
 
-JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detectMerek (JNIEnv * env, jobject obj, jobject bitmap){
+JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision3_detectMerek (JNIEnv * env, jobject obj, jobject bitmap){
     NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
     bool **image = convertToBoolmage(nativeBitmap);
-    //vector<Train> train = createKnowledge(path_knowledge);
-
+	
     vector<Train> trains;
-
-    string turns;
+	string turns;
 
     trains.push_back(Train('0',"RRRR"));
     trains.push_back(Train('1',"RLRLLLLRRLLLRRRLLLLRLLRRLRLLLRLLR"));
@@ -1196,7 +586,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
     delete nativeBitmap;
 
-    //FILE* file = fopen("/sdcard/textTest.txt","w+");
+	LOGD("Border Info Complete");
 
     for (int i=0;i<border_infos.size();i++) {
         BorderInfo border_info = border_infos[i];
@@ -1218,23 +608,12 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
             detectedChar.chain = sskode.str();
             interpretation.push_back(detectedChar);
 
-            //LOGD("%d, %d CHAIN CODE: %s", border_info.start_point.x, border_info.start_point.y, sskode.str().c_str());
-            //LOGD("%s", turns.c_str());
-
         }
-        //ss << guessChain(sskode.str());
-
-
-        //sskode << endl;
-        //fputs(sskode.str().c_str(), file);
-
     }
-    //fclose(file);
-
     stringstream ss;
 
-    //FILE* file = fopen("/sdcard/textTest.txt","w+");
-
+    
+	LOGD("DETECT MOBILE!");
     while(interpretation.size() > 0){
         int minValue = interpretation[0].start;
         int currentMin = 0;
@@ -1244,12 +623,10 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
                 currentMin = i;
             }
         }
-        //fputs(interpretation[currentMin].chain.c_str(), file);
         ss << interpretation[currentMin].value;
         interpretation.erase(interpretation.begin() + currentMin);
 
     }
-    //fclose(file);
 
     // [1] adalah ekspresi input, [2] adalah hasil perhitungan*/
     if (ss.str() == "0"){
@@ -1261,5 +638,6 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_MainActivity_detect
     //std::string tes[] = { ss.str().c_str(), "44" };
     jobjectArray hasil2 = createJavaArray(env, 2, tes);
 
+	
     return hasil2;
 }

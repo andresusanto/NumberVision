@@ -16,6 +16,7 @@ android {
             stl "stlport_shared"
             ldLibs "log", "jnigraphics"
         }
+
     }
     buildTypes {
         release {
@@ -23,8 +24,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-
-    productFlavors {
+	
+	productFlavors {
         x86 {
             ndk {
                 abiFilter "x86"
@@ -44,7 +45,6 @@ android {
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:22.+'
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile 'com.android.support:appcompat-v7:22.2.0'
 }
