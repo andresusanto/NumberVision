@@ -74,9 +74,6 @@ public class ChainCodeGenerator {
         return chain_code;
     }
 
-    private static Point[] direction = {new Point(1,0), new Point(1,1), new Point(0,1), new Point(-1,1),
-            new Point(-1,0), new Point(-1,-1), new Point(0,-1), new Point(1,-1)};
-
     void eraseImage(Point startPoint,
                      boolean [][]image,int length,int height) {
 
@@ -88,7 +85,7 @@ public class ChainCodeGenerator {
             Point front = bfs_queue.poll();
 
             for (int i=0;i<8;i++) {
-                Point tmp = front.add(direction[i]);
+                Point tmp = front.add(Point.direction[i]);
                 Point current_point = new Point(tmp.x,tmp.y);
                 if (current_point.x >=0 && current_point.x <= length && current_point.y >= 0 && current_point.y <= height &&
                         image[current_point.y][current_point.x]) {

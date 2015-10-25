@@ -15,6 +15,12 @@ public class NativeBitmap {
         int alpha, red, green, blue;
     };
 
+    public NativeBitmap(int width, int height) {
+        pixels = new int[width * height];
+        this.width = width;
+        this.height = height;
+    }
+
     private int convertArgbToInt(RGB argb) {
         return 0xFF000000 | (argb.red << 16) | (argb.green << 8) | (argb.blue);
     }
@@ -169,5 +175,33 @@ public class NativeBitmap {
 
         bitmap.getPixels(pixels, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
     }
+
+    public NativeBitmap smooth() {
+        NativeBitmap smoothBitmap = new NativeBitmap(width,height);
+        for (int i=0;i<height;i++) {
+            for (int j=0;j<width;j++) {
+                Point currentPoint = new Point(j,i);
+                int nNeighbor = 0;
+                RGB rgbAccum = new RGB();
+                for (int k=0;k<8;k++) {
+                    Point neighbor = currentPoint.add(Point.direction[k]);
+                    if ((neighbor.x > 0) && (neighbor.y > 0) && (neighbor.x < width) && (neighbor.y < height)) {
+                        nNeighbor++;
+                        RGB currentRGB = convertIntToArgb(pixels[i * width + j]);
+                        rgbAccum.red += currentRGB.red;
+                        rgbAccum.green += currentRGB.green;
+                        rgbAccum.blue += currentRGB.blue;
+                    }
+                }
+                rgbAccum.red /= nNeighbor;
+                rgbAccum.green /= nNeighbor;
+                rgbAccum.blue /= nNeighbor;
+                smoothBitmap.pixels[i * width + j] = convertArgbToInt(rgbAccum);
+            }
+        }
+        return smoothBitmap;
+    }
+
+
 
 }

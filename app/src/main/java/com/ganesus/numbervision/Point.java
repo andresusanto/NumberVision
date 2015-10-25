@@ -4,6 +4,12 @@ package com.ganesus.numbervision;
  * Created by kevinyu on 10/14/15.
  */
 public class Point {
+
+    public static Point[] direction = {new Point(1,0), new Point(1,1), new Point(0,1), new Point(-1,1),
+            new Point(-1,0), new Point(-1,-1), new Point(0,-1), new Point(1,-1)};
+
+    public static Point[] fourDirection = {new Point (1,0), new Point (0,1), new Point (0,-1), new Point (-1,0)};
+
     public int x;
     public int y;
 

@@ -5,9 +5,6 @@ import java.util.List;
 
 public class ZhangSuenGenerator {
 
-    private static Point[] direction = {new Point(1,0), new Point(1,1), new Point(0,1), new Point(-1,1),
-            new Point(-1,0), new Point(-1,-1), new Point(0,-1), new Point(1,-1)};
-
     public boolean[][] doZhangSuenThinning(final boolean[][] givenImage, boolean changeGivenImage) {
         boolean[][] binaryImage;
         if (changeGivenImage) {
@@ -89,7 +86,7 @@ public class ZhangSuenGenerator {
         int accumulator = 0;
         Point point = new Point(x,y);
         for (int i=0;i<8;i++) {
-            Point currentPoint = point.add(direction[i]);
+            Point currentPoint = point.add(Point.direction[i]);
             if (binaryImage[currentPoint.y][currentPoint.x]) accumulator+=1;
         }
         return accumulator;
