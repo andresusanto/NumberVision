@@ -1,6 +1,7 @@
 #include "fungsi.h"
 #include "ekualisasi.h"
 #include "vision.h"
+#include "turncode.h"
 
 
 extern "C"
@@ -25,6 +26,11 @@ extern "C"
 	// vision 2
 	JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision2_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path);
     JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_Vision2_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas);
+
+	// vision 3
+	JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision3_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path);
+    JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_Vision3_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas);
+    JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision3_detectMerek (JNIEnv * env, jobject obj, jobject bitmap);
 
 }
 
@@ -440,5 +446,199 @@ JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision2_detectAll (
     //std::string tes[] = { ss.str().c_str(), "44" };
     jobjectArray hasil2 = createJavaArray(env, 2, tes);
 
+    return hasil2;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//		VISION KETIGA
+
+
+
+
+JNIEXPORT jobject JNICALL Java_com_ganesus_numbervision_Vision3_preProses (JNIEnv * env, jobject obj, jobject bitmap, jobject canvas){
+    NativeBitmap* nCanvas = convertBitmapToNative(env, canvas);
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    NativeBitmap* pBitmap = grayscaleBitmap(nativeBitmap);
+    delete  nativeBitmap;
+
+    uint32_t nBitmapSize = pBitmap->bitmapInfo.height * pBitmap->bitmapInfo.width;
+    uint32_t* histogram = createHistogram(pBitmap);
+    uint32_t* color_transform = cumulative_equalization(histogram);
+
+    NativeBitmap* gBitmap = transformNativeBitmap(pBitmap, color_transform);
+    delete pBitmap;
+    delete histogram;
+    histogram = createHistogram(gBitmap);
+
+    float otsu = generateOtsu(histogram, nBitmapSize);
+
+    ARGB aGray;
+    aGray.red = 127; aGray.green = 127; aGray.blue = 127; aGray.alpha = 255;
+    uint32_t iGray= convertArgbToInt(aGray);
+
+    for (uint32_t i = 0; i < nBitmapSize; i++){
+        ARGB bitmapColor;
+        convertIntToArgb(gBitmap->pixels[i], &bitmapColor);
+
+        if (bitmapColor.red > otsu){
+            nCanvas->pixels[i] = iGray;
+        }
+    }
+
+    return convertNativeToBitmap(env, nCanvas);
+}
+
+
+JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision3_detectAll (JNIEnv * env, jobject obj, jobject bitmap, jstring path){
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    bool **image = convertToBoolmage(nativeBitmap);
+    const char* path_knowledge = env->GetStringUTFChars( path , NULL ) ;
+    vector<Knowledge> knowledge = createKnowledge(path_knowledge);
+    //vector<Train> train = createKnowledge(path_knowledge);
+
+    vector<DetectedChar> interpretation;
+    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
+    delete nativeBitmap;
+
+    stringstream list_kode_belok;
+
+    //FILE* file = fopen("/sdcard/textTest.txt","w+");
+
+    for (int i=0;i<border_infos.size();i++) {
+        BorderInfo border_info = border_infos[i];
+        stringstream sskode;
+
+        for (int j = 0; j < border_info.chain_codes.size(); j++) {
+            sskode << border_info.chain_codes[j];
+        }
+
+        if (border_info.chain_codes.size() > TRESHOLD_ERROR) {
+
+
+            //vector<char> predictions = predict(turns, train);
+
+            DetectedChar detectedChar;
+            detectedChar.start = border_info.start_point.x;
+            detectedChar.value = guessChain(sskode.str(), knowledge);
+
+            sskode << endl;
+            detectedChar.chain = sskode.str();
+            interpretation.push_back(detectedChar);
+
+            //LOGD("%d, %d CHAIN CODE: %s", border_info.start_point.x, border_info.start_point.y, sskode.str().c_str());
+            //LOGD("%s", turns.c_str());
+
+        }
+        //ss << guessChain(sskode.str());
+
+
+        //sskode << endl;
+        //fputs(sskode.str().c_str(), file);
+
+    }
+    //fclose(file);
+
+    stringstream ss;
+
+    FILE* file = fopen("/sdcard/textTest.txt","w+");
+
+    while(interpretation.size() > 0){
+        int minValue = interpretation[0].start;
+        int currentMin = 0;
+        for (int i = 1; i < interpretation.size(); i++){
+            if (interpretation[i].start < minValue){
+                minValue = interpretation[i].start;
+                currentMin = i;
+            }
+        }
+        fputs(interpretation[currentMin].chain.c_str(), file);
+        ss << interpretation[currentMin].value;
+
+        string turns = generate_turn(interpretation[currentMin].chain);
+        LOGD("CHAIN CODE: %s", interpretation[currentMin].chain.c_str());
+        LOGD("%s", turns.c_str());
+        list_kode_belok << turns << " -> " << interpretation[currentMin].value << endl;
+        interpretation.erase(interpretation.begin() + currentMin);
+
+    }
+    fclose(file);
+
+    // [1] adalah ekspresi input, [2] adalah hasil perhitungan*/
+    std::string tes[] = { ss.str().c_str(), list_kode_belok.str().c_str() };
+    //std::string tes[] = { ss.str().c_str(), "44" };
+    jobjectArray hasil2 = createJavaArray(env, 2, tes);
+
+	LOGD("DETECT PLAT COMPLETE!");
+	
+    return hasil2;
+}
+
+JNIEXPORT jobjectArray JNICALL Java_com_ganesus_numbervision_Vision3_detectMerek (JNIEnv * env, jobject obj, jobject bitmap){
+    NativeBitmap* nativeBitmap = convertBitmapToNative (env, bitmap);
+    bool **image = convertToBoolmage(nativeBitmap);
+	
+    vector<Train> trains;
+	string turns;
+
+    trains.push_back(Train('0',"RRRR"));
+    trains.push_back(Train('1',"RLRLLLLRRLLLRRRLLLLRLLRRLRLLLRLLR"));
+
+    vector<DetectedChar> interpretation;
+    vector<BorderInfo> border_infos = get_border_infos(image,nativeBitmap->bitmapInfo.width,nativeBitmap->bitmapInfo.height);
+    delete nativeBitmap;
+
+	LOGD("Border Info Complete");
+
+    for (int i=0;i<border_infos.size();i++) {
+        BorderInfo border_info = border_infos[i];
+        stringstream sskode;
+
+        for (int j = 0; j < border_info.chain_codes.size(); j++) {
+            sskode << border_info.chain_codes[j];
+        }
+
+        if (border_info.chain_codes.size() > TRESHOLD_ERROR) {
+            turns = generate_turn(sskode.str());
+            vector<char> predictions = predict(turns, trains);
+
+            DetectedChar detectedChar;
+            detectedChar.start = border_info.start_point.x;
+            detectedChar.value = predictions[0]; //guessChain(sskode.str(), knowledge);
+
+            sskode << endl;
+            detectedChar.chain = sskode.str();
+            interpretation.push_back(detectedChar);
+
+        }
+    }
+    stringstream ss;
+
+    
+	LOGD("DETECT MOBILE!");
+    while(interpretation.size() > 0){
+        int minValue = interpretation[0].start;
+        int currentMin = 0;
+        for (int i = 1; i < interpretation.size(); i++){
+            if (interpretation[i].start < minValue){
+                minValue = interpretation[i].start;
+                currentMin = i;
+            }
+        }
+        ss << interpretation[currentMin].value;
+        interpretation.erase(interpretation.begin() + currentMin);
+
+    }
+
+    // [1] adalah ekspresi input, [2] adalah hasil perhitungan*/
+    if (ss.str() == "0"){
+        ss.str("HONDA");
+    }else if (ss.str() == "1"){
+        ss.str("TOYOTA");
+    }
+    std::string tes[] = { ss.str().c_str(), turns };
+    //std::string tes[] = { ss.str().c_str(), "44" };
+    jobjectArray hasil2 = createJavaArray(env, 2, tes);
+
+	
     return hasil2;
 }

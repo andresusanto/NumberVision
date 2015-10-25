@@ -31,7 +31,7 @@ public class Selector extends AppCompatActivity {
                 i = new Intent(this, Vision2.class);
                 break;
             case R.id.button6 :
-                i = new Intent(this, DetectWarnaActivity.class);
+                i = new Intent(this, Vision3.class);
                 break;
             case R.id.button7 :
                 i = new Intent(this, DetectWarnaActivity.class);
