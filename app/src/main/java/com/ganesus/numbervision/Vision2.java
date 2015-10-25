@@ -52,6 +52,8 @@ public class Vision2 extends AppCompatActivity {
             bmp = Bitmap.createBitmap(bmp, 546, 491, 549, 115);
         }else if(bmp.getWidth() == 1024){
             bmp = Bitmap.createBitmap(bmp, 345, 323, 390, 107);
+        }else if(bmp.getWidth() == 1019){
+            bmp = Bitmap.createBitmap(bmp, 341, 438, 332, 55);
         }
 
         String hasil = detectAll(bmp, KNOWLEDGE_PATH)[0];
